@@ -173,7 +173,7 @@ class SketchySGD(Optimizer):
         Y = self._hvp_vmap(gradsH, params)(Phi)
 
         # Calculate shift
-        shift = torch.finfo(Y.dtype).eps
+        shift = torch.finfo(Y.dtype).eps * 100
         Y_shifted = Y + shift * Phi
         # Calculate Phi^T * H * Phi (w/ shift) for Cholesky
         choleskytarget = torch.mm(Y_shifted, Phi.t())
