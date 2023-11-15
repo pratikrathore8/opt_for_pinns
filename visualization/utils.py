@@ -12,8 +12,8 @@ INPUT:
 - x_num: positive integer; number of x points
 - t_num: positive integer; number of t points
 OUTPUT: 
-- x: tutple of (x_res, x_left, x_right, x_upper, x_lower)
-- t: tutple of (t_res, t_left, t_right, t_upper, t_lower)
+- x: tuple of (x_res, x_left, x_right, x_upper, x_lower)
+- t: tuple of (t_res, t_left, t_right, t_upper, t_lower)
 where: 
 > res: numpy array / tensor of size (x_num * t_num) * 2; residual points -- all of the grid points
 > b_left: numpy array / tensor of size (x_num) * 2; initial points (corresponding to initial time step)
@@ -58,7 +58,7 @@ Helper function for initializing neural net parameters.
 def init_weights(m):
   if isinstance(m, nn.Linear):
     torch.nn.init.xavier_uniform_(m.weight)
-    m.bias.data.fill_(0.01)
+    m.bias.data.fill_(0.0)
 
 """
 Helper function for making predictions with PINN. 

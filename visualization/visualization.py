@@ -163,7 +163,7 @@ INPUT:
 OUTPUT: 
 - directions: list of size 2; top two eigenvectors of the Hessian
 """
-def compute_Hessian_directions(data, pred_func, loss_func, model, device='cuda'): 
+def compute_hessian_directions(data, pred_func, loss_func, model, device='cuda'): 
   use_cuda = False if device=='cpu' else True
   hessian_comp = hessian(model, pred_func, loss_func, data, cuda=use_cuda, device=device)
   _, eig_vecs = hessian_comp.eigenvalues(maxIter=100, tol=1e-3, top_n=2)
