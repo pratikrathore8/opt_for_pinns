@@ -11,9 +11,11 @@ INPUT:
 - t_range: list of size 2; lower and upper bounds of temporal variable t
 - x_num: positive integer; number of x points
 - t_num: positive integer; number of t points
+- random: boolean; indication whether to (uniformly) randomly from the grid
+- device: string; the device that the samples will be stored at
 OUTPUT: 
-- x: tuple of (x_res, x_left, x_right, x_upper, x_lower)
-- t: tuple of (t_res, t_left, t_right, t_upper, t_lower)
+- x: tutple of (x_res, x_left, x_right, x_upper, x_lower)
+- t: tutple of (t_res, t_left, t_right, t_upper, t_lower)
 where: 
 > res: numpy array / tensor of size (x_num * t_num) * 2; residual points -- all of the grid points
 > b_left: numpy array / tensor of size (x_num) * 2; initial points (corresponding to initial time step)
@@ -21,9 +23,13 @@ where:
 > b_upper: numpy array / tensor of size (t_num) * 2; upper boundary points
 > b_lower: numpy array / tensor of size (t_num) * 2; lower boundary points
 """
-def get_data(x_range, t_range, x_num, t_num, device='cpu'):
-  x = np.linspace(x_range[0], x_range[1], x_num)
-  t = np.linspace(t_range[0], t_range[1], t_num)
+def get_data(x_range, t_range, x_num, t_num, random=False, device='cpu'):
+  if random: 
+    x = np.concatenate((x_range[0], np.random.uniform(x_range[0], x_range[1], x_num-2), x_range[1]))
+    t = np.concatenate((t_range[0], np.random.uniform(t_range[0], t_range[1], t_num-2), t_range[1]))
+  else: 
+    x = np.linspace(x_range[0], x_range[1], x_num)
+    t = np.linspace(t_range[0], t_range[1], t_num)
 
   x_mesh, t_mesh = np.meshgrid(x,t)
   data = np.concatenate((np.expand_dims(x_mesh, -1), np.expand_dims(t_mesh, -1)), axis=-1)
