@@ -25,8 +25,8 @@ where:
 """
 def get_data(x_range, t_range, x_num, t_num, random=False, device='cpu'):
   if random: 
-    x = np.concatenate((x_range[0], np.random.uniform(x_range[0], x_range[1], x_num-2), x_range[1]))
-    t = np.concatenate((t_range[0], np.random.uniform(t_range[0], t_range[1], t_num-2), t_range[1]))
+    x = np.concatenate(([x_range[0]], np.random.uniform(x_range[0], x_range[1], x_num-2), [x_range[1]]))
+    t = np.concatenate(([t_range[0]], np.random.uniform(t_range[0], t_range[1], t_num-2), [t_range[1]]))
   else: 
     x = np.linspace(x_range[0], x_range[1], x_num)
     t = np.linspace(t_range[0], t_range[1], t_num)
