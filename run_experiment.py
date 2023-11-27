@@ -80,14 +80,14 @@ def main():
         experiment_args["wandb_project"]))
     print("GPU to use: {}".format(experiment_args["device"]))
 
-    run_name = "{}/{}".format(experiment_args["pde"], experiment_args["opt"])
-    with wandb.init(project=experiment_args["wandb_project"], name=run_name, config=experiment_args):
+    with wandb.init(project=experiment_args["wandb_project"], config=experiment_args):
         # initialize model
         model = PINN(in_dim=2, hidden_dim=experiment_args["num_neurons"], out_dim=1,
                      num_layer=experiment_args["num_layers"]).to(experiment_args["device"])
         # train the model
         try:
             train(model,
+                  proj_name=experiment_args["wandb_project"],
                   pde_name=experiment_args["pde"],
                   pde_params=experiment_args["pde_params"],
                   loss_name=experiment_args["loss"],
@@ -102,7 +102,6 @@ def main():
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
             raise e
-
 
 if __name__ == "__main__":
     main()

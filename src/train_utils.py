@@ -5,9 +5,13 @@ from torch.optim import Adam, LBFGS
 import random
 import re
 import wandb
+import os
+import shutil
+import bz2
+import pickle
 
 """
-Helpfer function for obtaining corresponding domain and loss function of the chosen PDE type. 
+Helper function for obtaining corresponding domain and loss function of the chosen PDE type. 
 
 INPUT: 
 - pde_name: string; name of the PDE problem
@@ -22,9 +26,10 @@ OUTPUT:
 def get_pde(pde_name, pde_params_list, loss_name): 
     # determine loss type
     loss_options = {
-        "l1": nn.L1Loss(),
-        "mse": nn.MSELoss(), 
-        "huber": nn.HuberLoss()
+        "l1": {"res": nn.L1Loss(), "bc": nn.L1Loss(), "ic": nn.L1Loss()},
+        "mse": {"res": nn.MSELoss(), "bc": nn.MSELoss(), "ic": nn.MSELoss()},
+        "huber": {"res": nn.HuberLoss(), "bc": nn.HuberLoss(), "ic": nn.HuberLoss()},
+        "hybrid": {"res": nn.HuberLoss(), "bc": nn.MSELoss(), "ic": nn.MSELoss()}
     }
     try: 
         loss_type = loss_options[loss_name]
@@ -50,10 +55,9 @@ def get_pde(pde_name, pde_params_list, loss_name):
             u_x = torch.autograd.grad(outputs_res, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
             u_t = torch.autograd.grad(outputs_res, t_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
 
-            loss_res = loss_type(u_t + pde_coefs["beta"] * u_x, torch.zeros_like(u_t))
-            loss_bc = loss_type(outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
-            # loss_ic = loss_type(outputs_left[:,0] - torch.sin(x_left[:,0]), torch.zeros_like(outputs_left[:,0]))
-            loss_ic = loss_type(outputs_left[:,0], torch.sin(x_left[:,0]))
+            loss_res = loss_type["res"](u_t + pde_coefs["beta"] * u_x, torch.zeros_like(u_t))
+            loss_bc = loss_type["bc"](outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
+            loss_ic = loss_type["ic"](outputs_left[:,0], torch.sin(x_left[:,0]))
 
             loss = loss_res + loss_bc + loss_ic
 
@@ -97,8 +101,8 @@ INPUT:
 - random: boolean; indication whether to (uniformly) randomly from the grid
 - device: string; the device that the samples will be stored at
 OUTPUT: 
-- x: tutple of (x_res, x_left, x_right, x_upper, x_lower)
-- t: tutple of (t_res, t_left, t_right, t_upper, t_lower)
+- x: tuple of (x_res, x_left, x_right, x_upper, x_lower)
+- t: tuple of (t_res, t_left, t_right, t_upper, t_lower)
 where: 
 > res: numpy array / tensor of size (x_num * t_num) * 2; residual points -- all of the grid points
 > b_left: numpy array / tensor of size (x_num) * 2; initial points (corresponding to initial time step)
@@ -146,7 +150,8 @@ Helper function for initializing neural net parameters.
 """
 def init_weights(m):
   if isinstance(m, nn.Linear):
-    torch.nn.init.xavier_uniform_(m.weight)
+    # torch.nn.init.xavier_uniform_(m.weight)
+    torch.nn.init.xavier_normal_(m.weight)
     m.bias.data.fill_(0.0)
 
 """
@@ -157,7 +162,7 @@ INPUT:
 - t: tutple of (t_res, t_left, t_right, t_upper, t_lower)
 - model: PINN model
 OUTPUT: 
-- preds: tutple of (pred_res, pred_left, pred_right, pred_upper, pred_lower)
+- preds: tuple of (pred_res, pred_left, pred_right, pred_upper, pred_lower)
 where: 
 > pred_res: predictions on residual points
 > pred_left: predictions on initial points
@@ -257,6 +262,7 @@ def get_opt_params(opt_params_list):
     return parse_params_list(opt_params_list)
 
 def train(model,
+          proj_name,
           pde_name,
           pde_params,
           loss_name,
@@ -278,12 +284,15 @@ def train(model,
     x, t = get_data(x_range, t_range, n_x, n_t, random=False, device=device)
     wandb.log({'x': x, 't': t}) # Log training set
 
-    # Log initial model and loss
-    wandb.log({'model_state_dict': model.state_dict(),
-                'opt_state_dict': opt.state_dict(),
-                'loss': loss_func(x, t, predict(x, t, model))})
+    # Store initial weights and loss
+    save_folder = os.path.join(os.path.abspath(f'./{proj_name}_temp'), wandb.run.id)
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
 
-    print(f'num_epochs: {num_epochs}')
+    wandb.log({'loss': loss_func(x, t, predict(x, t, model))})
+
+    weights_hist = []
+    weights_hist.append([p.detach().cpu().numpy() for p in model.parameters()])
     
     for i in range(num_epochs):
         model.train()
@@ -298,16 +307,34 @@ def train(model,
 
         # record model parameters and loss
         model.eval()
-        wandb.log({'model_state_dict': model.state_dict(),
-                'opt_state_dict': opt.state_dict(),
-                'loss': loss_func(x, t, predict(x, t, model))})
+        weights_hist.append([p.detach().cpu().numpy()
+                            for p in model.parameters()])
+        wandb.log({'loss': loss_func(x, t, predict(x, t, model))})
     
     # evaluate errors
+    with torch.no_grad():
+        predictions = predict(x, t, model)[0].cpu().detach().numpy()
+    targets = get_ref_solutions(pde_name, pde_coefs, x, t)
+    train_l1re = l1_relative_error(predictions, targets)
+    train_l2re = l2_relative_error(predictions, targets)
+
     x_test, t_test = get_data(x_range, t_range, n_x, n_t, random=True, device=device)
     with torch.no_grad():
         predictions = predict(x_test, t_test, model)[0].cpu().detach().numpy()
     targets = get_ref_solutions(pde_name, pde_coefs, x_test, t_test)
-    l1re = l1_relative_error(predictions, targets)
-    l2re = l2_relative_error(predictions, targets)
-    wandb.log({'l1re': l1re, 
-               'l2re': l2re})
+    test_l1re = l1_relative_error(predictions, targets)
+    test_l2re = l2_relative_error(predictions, targets)
+
+    wandb.log({'train/l1re': train_l1re,
+                'train/l2re': train_l2re,
+                'test/l1re': test_l1re, 
+                'test/l2re': test_l2re})
+    
+    # Save weights history as bz2 file
+    filename = os.path.join(save_folder, 'weights_history.bz2')
+    serialized_data = pickle.dumps(weights_hist)
+    with bz2.open(filename, 'wb') as f:
+        f.write(serialized_data)
+
+    # Save file to wandb
+    # wandb.save(os.path.abspath(filename))

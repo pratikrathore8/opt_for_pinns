@@ -63,7 +63,8 @@ Helper function for initializing neural net parameters.
 """
 def init_weights(m):
   if isinstance(m, nn.Linear):
-    torch.nn.init.xavier_uniform_(m.weight)
+    # torch.nn.init.xavier_uniform_(m.weight)
+    torch.nn.init.xavier_normal_(m.weight)
     m.bias.data.fill_(0.0)
 
 """
