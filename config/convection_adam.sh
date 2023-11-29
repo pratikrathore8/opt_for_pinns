@@ -9,9 +9,9 @@ opt=adam
 lrs=(0.00001 0.0001 0.001 0.01)
 epochs=1000
 betas=(1 10 20 30 40)
-devices=(0 3 4 5 6 7)
+devices=(2 3 7)
 proj=convection_adam
-max_parallel_jobs=6
+max_parallel_jobs=3
 
 background_pids=()
 current_device=0
@@ -39,6 +39,7 @@ do
             for beta in "${betas[@]}"
             do
                 for lr in "${lrs[@]}"
+                do
                     if [ $interrupted -eq 0 ]; then  # Check if Ctrl+C has been pressed
                         device=${devices[current_device]}
                         current_device=$(( (current_device + 1) % ${#devices[@]} ))
