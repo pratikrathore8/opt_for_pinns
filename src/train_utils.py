@@ -185,7 +185,6 @@ OUTPUT:
 where: 
 > res: numpy array / tensor of size (x_num * t_num) * 2; residual points -- all of the grid points
 > b_left: numpy array / tensor of size (x_num) * 2; initial points (corresponding to initial time step)
-> b_right: numpy array / tensor of size (x_num) * 2; terminal points (corresponding to terminal time step)
 > b_upper: numpy array / tensor of size (t_num) * 2; upper boundary points
 > b_lower: numpy array / tensor of size (t_num) * 2; lower boundary points
 > res_idx: numpy array of length (x_num - 2)(t_num - 2); corresponding indices of the sampled residual points from the finer grid
@@ -267,11 +266,10 @@ INPUT:
 - t: tutple of (t_res, t_left, t_upper, t_lower)
 - model: PINN model
 OUTPUT: 
-- preds: tuple of (pred_res, pred_left, pred_right, pred_upper, pred_lower)
+- preds: tuple of (pred_res, pred_left, pred_upper, pred_lower)
 where: 
 > pred_res: predictions on residual points
 > pred_left: predictions on initial points
-> pred_right: predictions on terminal points
 > pred_upper: predictions on upper boundary points
 > pred_lower: predictions on lower boundary points
 """
