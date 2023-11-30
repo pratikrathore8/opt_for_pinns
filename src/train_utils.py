@@ -48,9 +48,9 @@ def get_pde(pde_name, pde_params_list, loss_name):
         t_range = [0, 1]
 
         def loss_func(x, t, pred): 
-            x_res, x_left, x_right, x_upper, x_lower = x
-            t_res, t_left, t_right, t_upper, t_lower = t
-            outputs_res, outputs_left, outputs_right, outputs_upper, outputs_lower = pred
+            x_res, x_left, x_upper, x_lower = x
+            t_res, t_left, t_upper, t_lower = t
+            outputs_res, outputs_left, outputs_upper, outputs_lower = pred
 
             u_x = torch.autograd.grad(outputs_res, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
             u_t = torch.autograd.grad(outputs_res, t_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
@@ -71,9 +71,9 @@ def get_pde(pde_name, pde_params_list, loss_name):
         t_range = [0, 1]
 
         def loss_func(x, t, pred): 
-            x_res, x_left, x_right, x_upper, x_lower = x
-            t_res, t_left, t_right, t_upper, t_lower = t
-            outputs_res, outputs_left, outputs_right, outputs_upper, outputs_lower = pred
+            x_res, x_left, x_upper, x_lower = x
+            t_res, t_left, t_upper, t_lower = t
+            outputs_res, outputs_left, outputs_upper, outputs_lower = pred
 
             u_x = torch.autograd.grad(outputs_res, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
             u_xx = torch.autograd.grad(u_x, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
@@ -98,8 +98,8 @@ Helper function for computing reference solution to the given PDE at given point
 INPUT: 
 - pde_name: string; name of the PDE problem
 - pde_coefs: dictionary containing coefficients of the PDE
-- x: tuple of (x_res, x_left, x_right, x_upper, x_lower)
-- t: tuple of (t_res, t_left, t_right, t_upper, t_lower)
+- x: tuple of (x_res, x_left, x_upper, x_lower)
+- t: tuple of (t_res, t_left, t_upper, t_lower)
 - data_params: dictionary containing parameters used to generate the data
 OUTPUT: 
 - sol: 
@@ -142,12 +142,11 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
             u[:,i+1] = u_t
 
         sol_left = u[:,0].reshape(-1,1)
-        sol_right = u[:,-1].reshape(-1,1)
         sol_upper = u[-1,:].reshape(-1,1)
         sol_lower = u[0,:].reshape(-1,1)
-        sol_res = u[1:-1, 1:-1].T.reshape(-1,1)[res_idx]
+        sol_res = u[1:-1, 1:].T.reshape(-1,1)[res_idx]
 
-        sol = np.vstack([sol_res, sol_left, sol_right, sol_upper, sol_lower])
+        sol = np.vstack([sol_res, sol_left, sol_upper, sol_lower])
 
     else: 
         raise RuntimeError("{} is not a valid PDE name.".format(pde_name))
@@ -168,7 +167,6 @@ def set_random_seed(seed):
 
 """
 Helper function for generating data on a grid. 
-Adapted from implementation: https://github.com/AdityaLab/pinnsformer/blob/main/util.py
 
 INPUT: 
 - x_range: list of size 2; lower and upper bounds of spatial variable x
@@ -180,8 +178,8 @@ INPUT:
                    compared to the full grid; random subsamples of the residual points are drawn from the finer grid
 - device: string; the device that the samples will be stored at
 OUTPUT: 
-- x: tuple of (x_res, x_left, x_right, x_upper, x_lower)
-- t: tuple of (t_res, t_left, t_right, t_upper, t_lower)
+- x: tuple of (x_res, x_left, x_upper, x_lower)
+- t: tuple of (t_res, t_left, t_upper, t_lower)
 - data_params: dictionary containing parameters used to generate the data 
                including x_range, t_range, x_num, t_num, grid_multiplier, and res_idx
 where: 
@@ -199,9 +197,6 @@ def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, 
   # initial time
   x_left = x.copy()
   t_left = t_range[0] * np.ones([x_num,1])
-  # terminal time
-  x_right = x.copy()
-  t_right = t_range[1] * np.ones([x_num,1])
   # lower boundary
   x_lower = x_range[0] * np.ones([t_num,1])
   t_lower = t.copy()
@@ -220,10 +215,10 @@ def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, 
     # generate finer grid
     x = np.linspace(x_range[0], x_range[1], x_num * grid_multiplier).reshape(-1, 1)
     t = np.linspace(t_range[0], t_range[1], t_num * grid_multiplier).reshape(-1, 1)
-    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:-1])
+    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
     # sub-sample randomly from the new grid
     mesh = np.hstack((x_mesh.flatten()[:, None], t_mesh.flatten()[:, None]))
-    idx = np.random.choice(mesh.shape[0], (x_num - 2) * (t_num - 2), replace=False)
+    idx = np.random.choice(mesh.shape[0], (x_num - 2) * (t_num - 1), replace=False)
     x_res = mesh[idx, 0:1]
     t_res = mesh[idx, 1:2]
     # update parameters used for data generation
@@ -231,19 +226,17 @@ def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, 
     data_params["res_idx"] = idx
   else: 
     # form interior grid
-    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:-1])
+    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
     x_res = x_mesh.reshape(-1,1)
     t_res = t_mesh.reshape(-1,1)
     # update parameters used for data generation
     data_params["grid_multiplier"] = 1
-    data_params["res_idx"] = np.arange((x_num - 2) * (t_num - 2))
+    data_params["res_idx"] = np.arange((x_num - 2) * (t_num - 1))
 
   # move data to target device
   if device != 'cpu': 
     x_left = torch.tensor(x_left, dtype=torch.float32, requires_grad=True).to(device)
     t_left = torch.tensor(t_left, dtype=torch.float32, requires_grad=True).to(device)
-    x_right = torch.tensor(x_right, dtype=torch.float32, requires_grad=True).to(device)
-    t_right = torch.tensor(t_right, dtype=torch.float32, requires_grad=True).to(device)
     x_upper = torch.tensor(x_upper, dtype=torch.float32, requires_grad=True).to(device)
     t_upper = torch.tensor(t_upper, dtype=torch.float32, requires_grad=True).to(device)
     x_lower = torch.tensor(x_lower, dtype=torch.float32, requires_grad=True).to(device)
@@ -252,8 +245,8 @@ def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, 
     t_res = torch.tensor(t_res, dtype=torch.float32, requires_grad=True).to(device)
 
   # form tuples
-  x = (x_res, x_left, x_right, x_upper, x_lower)
-  t = (t_res, t_left, t_right, t_upper, t_lower)
+  x = (x_res, x_left, x_upper, x_lower)
+  t = (t_res, t_left, t_upper, t_lower)
 
   return x, t, data_params
 
@@ -270,8 +263,8 @@ def init_weights(m):
 Helper function for making predictions with PINN. 
 
 INPUT: 
-- x: tutple of (x_res, x_left, x_right, x_upper, x_lower)
-- t: tutple of (t_res, t_left, t_right, t_upper, t_lower)
+- x: tutple of (x_res, x_left, x_upper, x_lower)
+- t: tutple of (t_res, t_left, t_upper, t_lower)
 - model: PINN model
 OUTPUT: 
 - preds: tuple of (pred_res, pred_left, pred_right, pred_upper, pred_lower)
@@ -284,16 +277,15 @@ where:
 """
 def predict(x, t, model): 
 
-    x_res, x_left, x_right, x_upper, x_lower = x
-    t_res, t_left, t_right, t_upper, t_lower = t
+    x_res, x_left, x_upper, x_lower = x
+    t_res, t_left, t_upper, t_lower = t
     
     pred_res = model(x_res, t_res)
     pred_left = model(x_left, t_left)
-    pred_right = model(x_right, t_right)
     pred_upper = model(x_upper, t_upper)
     pred_lower = model(x_lower, t_lower)
     
-    preds = (pred_res, pred_left, pred_right, pred_upper, pred_lower) 
+    preds = (pred_res, pred_left, pred_upper, pred_lower) 
     
     return preds
 
