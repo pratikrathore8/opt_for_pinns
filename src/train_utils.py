@@ -141,9 +141,6 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
             u_t = np.real(np.fft.ifft(u_hat))
             u[:,i+1] = u_t
 
-
-         (x_res, x_left, x_right, x_upper, x_lower)
-
         sol_left = u[:,0].reshape(-1,1)
         sol_right = u[:,-1].reshape(-1,1)
         sol_upper = u[-1,:].reshape(-1,1)
