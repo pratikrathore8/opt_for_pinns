@@ -119,7 +119,7 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
         t = np.linspace(t_range[0], t_range[1], t_num).reshape(-1, 1)
         x_mesh, t_mesh = np.meshgrid(x, t)
         # compute initial solution
-        u0 = np.exp(-(1/2) * np.square((x - np.pi) / (np.pi / 4)))
+        u0 = np.exp(-(1/2) * np.square((x - np.pi) / (np.pi / 4))).flatten()
         u = np.zeros((x_num, t_num))
         u[:-1,0] = u0
 
