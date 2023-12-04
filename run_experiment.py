@@ -27,10 +27,12 @@ def main():
                         help='number of neurons per layer')
     parser.add_argument('--loss', type=str, default='mse',
                         help='type of loss function')
-    parser.add_argument('--num_x', type=int, default=101,
-                        help='number of spatial sample points')
+    parser.add_argument('--num_x', type=int, default=257,
+                        help='number of spatial sample points (power of 2 + 1)')
     parser.add_argument('--num_t', type=int, default=101,
                         help='number of temporal sample points')
+    parser.add_argument('--num_res', type=int, default=10000,
+                        help='number of sampled residual points')
     parser.add_argument('--batch_size', type=int, default=None,
                         help='number of samples in each batch')
     parser.add_argument('--epochs', type=int, default=1000,
@@ -58,6 +60,7 @@ def main():
         "loss": args.loss,
         "num_x": args.num_x,
         "num_t": args.num_t,
+        "num_res": args.num_res, 
         "batch_size": args.batch_size,
         "epochs": args.epochs,
         "wandb_project": args.wandb_project,
@@ -74,6 +77,7 @@ def main():
         experiment_args["opt_params"]))
     print("Number of spatial points (x): {}".format(experiment_args["num_x"]))
     print("Number of temporal points (t): {}".format(experiment_args["num_t"]))
+    print("Number of random residual points to sample: {}".format(experiment_args["num_res"]))
     print("Number of epochs: {}".format(experiment_args["epochs"]))
     print("Batch size: {}".format(experiment_args["batch_size"]))
     print("Weights and Biases project: {}".format(
@@ -95,6 +99,7 @@ def main():
                   opt_params_list=experiment_args["opt_params"],
                   n_x=experiment_args["num_x"],
                   n_t=experiment_args["num_t"],
+                  n_res=experiment_args["num_res"],
                   batch_size=experiment_args["batch_size"],
                   num_epochs=experiment_args["epochs"],
                   device=experiment_args["device"])
