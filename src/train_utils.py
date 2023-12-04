@@ -85,7 +85,7 @@ def get_pde(pde_name, pde_params_list, loss_name):
 
             loss = loss_res + loss_bc + loss_ic
 
-        return loss
+            return loss
 
     else: 
         raise RuntimeError("{} is not a valid PDE name.".format(pde_name))
@@ -113,25 +113,24 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
         t_range = data_params["t_range"]
         x_num = data_params["x_num"]
         t_num = data_params["t_num"]
-        grid_multiplier = data_params["grid_multiplier"]
         res_idx = data_params["res_idx"]
         # generate grid
-        x = np.linspace(x_range[0], x_range[1], x_num * grid_multiplier).reshape(-1, 1)
-        t = np.linspace(t_range[0], t_range[1], t_num * grid_multiplier).reshape(-1, 1)
+        x = np.linspace(x_range[0], x_range[1], x_num-1, endpoint=False).reshape(-1, 1) # exclude upper boundary
+        t = np.linspace(t_range[0], t_range[1], t_num).reshape(-1, 1)
         x_mesh, t_mesh = np.meshgrid(x, t)
         # compute initial solution
         u0 = np.exp(-(1/2) * np.square((x - np.pi) / (np.pi / 4)))
-        u = np.zeros((x_num * grid_multiplier, t_num * grid_multiplier))
-        u[:,0] = u0
+        u = np.zeros((x_num, t_num))
+        u[:-1,0] = u0
 
-        IKX_pos = 1j * np.arange(0, (x_num * grid_multiplier) / 2 + 1, 1)
-        IKX_neg = 1j * np.arange(-(x_num * grid_multiplier) / 2 + 1, 0, 1)
+        IKX_pos = 1j * np.arange(0, (x_num-1) / 2 + 1, 1)
+        IKX_neg = 1j * np.arange(-(x_num-1) / 2 + 1, 0, 1)
         IKX = np.concatenate((IKX_pos, IKX_neg))
         IKX2 = IKX * IKX
         # perform time-marching
         t_step_size = (t_range[1] - t_range[0]) / (t_num - 1)
-        u_t = u_0.copy()
-        for i in range(t_num * grid_multiplier - 1): 
+        u_t = u0.copy()
+        for i in range(t_num - 1): 
             # reaction component
             factor = u_t * np.exp(pde_coefs['rho'] * t_step_size)
             u_t = factor / (factor + (1 - u_t))
@@ -139,8 +138,11 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
             factor = np.exp(pde_coefs['nu'] * IKX2 * t_step_size)
             u_hat = np.fft.fft(u_t) * factor
             u_t = np.real(np.fft.ifft(u_hat))
-            u[:,i+1] = u_t
+            u[:-1,i+1] = u_t
 
+        # add back solution on the upper boundary using the periodic boundary condition
+        u[-1,:] = u[0,:]
+        # split the solution
         sol_left = u[:,0].reshape(-1,1)
         sol_upper = u[-1,:].reshape(-1,1)
         sol_lower = u[0,:].reshape(-1,1)
@@ -174,8 +176,7 @@ INPUT:
 - x_num: positive integer; number of x points
 - t_num: positive integer; number of t points
 - random: boolean; indication whether to (uniformly) randomly from the grid
-- grid_multiplier: positive integer; multiplicative factor that determines granularity of a finer grid 
-                   compared to the full grid; random subsamples of the residual points are drawn from the finer grid
+- num_res_samples: positive integer; number of random samples to draw for residual points
 - device: string; the device that the samples will be stored at
 OUTPUT: 
 - x: tuple of (x_res, x_left, x_upper, x_lower)
@@ -183,13 +184,13 @@ OUTPUT:
 - data_params: dictionary containing parameters used to generate the data 
                including x_range, t_range, x_num, t_num, grid_multiplier, and res_idx
 where: 
-> res: numpy array / tensor of size (x_num * t_num) * 2; residual points -- all of the grid points
+> res: numpy array / tensor of size (x_num-2)(t_num-1) * 2 or num_res_samples * 2; residual points (interior grid or random samples from it)
 > b_left: numpy array / tensor of size (x_num) * 2; initial points (corresponding to initial time step)
 > b_upper: numpy array / tensor of size (t_num) * 2; upper boundary points
 > b_lower: numpy array / tensor of size (t_num) * 2; lower boundary points
-> res_idx: numpy array of length (x_num - 2)(t_num - 2); corresponding indices of the sampled residual points from the finer grid
+> res_idx: numpy array of length (x_num-2)(t_num-1) or num_res_samples; corresponding indices of the sampled residual points from the interior grid
 """
-def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, device='cpu'):
+def get_data(x_range, t_range, x_num, t_num, random=False, num_res_samples=1e4, device='cpu'):
   # generate initial and boundary points
   x = np.linspace(x_range[0], x_range[1], x_num).reshape(-1, 1)
   t = np.linspace(t_range[0], t_range[1], t_num).reshape(-1, 1)
@@ -202,8 +203,8 @@ def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, 
   # upper boundary
   x_upper = x_range[1] * np.ones([t_num,1])
   t_upper = t.copy()
-
-  # generate residual points
+  # residual points
+  x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
   data_params = {
     "x_range": x_range, 
     "t_range": t_range, 
@@ -211,25 +212,14 @@ def get_data(x_range, t_range, x_num, t_num, random=False, grid_multiplier=100, 
     "t_num": t_num
   }
   if random: 
-    # generate finer grid
-    x = np.linspace(x_range[0], x_range[1], x_num * grid_multiplier).reshape(-1, 1)
-    t = np.linspace(t_range[0], t_range[1], t_num * grid_multiplier).reshape(-1, 1)
-    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
-    # sub-sample randomly from the new grid
     mesh = np.hstack((x_mesh.flatten()[:, None], t_mesh.flatten()[:, None]))
-    idx = np.random.choice(mesh.shape[0], (x_num - 2) * (t_num - 1), replace=False)
+    idx = np.random.choice(mesh.shape[0], num_res_samples, replace=False)
     x_res = mesh[idx, 0:1]
     t_res = mesh[idx, 1:2]
-    # update parameters used for data generation
-    data_params["grid_multiplier"] = grid_multiplier
     data_params["res_idx"] = idx
   else: 
-    # form interior grid
-    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
     x_res = x_mesh.reshape(-1,1)
     t_res = t_mesh.reshape(-1,1)
-    # update parameters used for data generation
-    data_params["grid_multiplier"] = 1
     data_params["res_idx"] = np.arange((x_num - 2) * (t_num - 1))
 
   # move data to target device
@@ -382,6 +372,7 @@ def train(model,
           opt_params_list,
           n_x,
           n_t,
+          n_res,
           batch_size,
           num_epochs,
           device):
@@ -393,7 +384,7 @@ def train(model,
 
     # TODO: Account for different values of batch_size
 
-    x, t, data_params = get_data(x_range, t_range, n_x, n_t, random=False, device=device)
+    x, t, data_params = get_data(x_range, t_range, n_x, n_t, random=True, num_res_samples=n_res, device=device)
     wandb.log({'x': x, 't': t}) # Log training set
 
     # Store initial weights and loss
@@ -430,15 +421,18 @@ def train(model,
     train_l1re = l1_relative_error(predictions, targets)
     train_l2re = l2_relative_error(predictions, targets)
 
-    x_test, t_test, data_params_test = get_data(x_range, t_range, n_x, n_t, random=True, device=device)
+    # coarse grid for testing
+    n_x_test = int((n_x - 1) / 2) + 1
+    n_t_test = n_t
+    x_test, t_test, data_params_test = get_data(x_range, t_range, n_x_test, n_t_test, random=False, device=device)
     with torch.no_grad():
         predictions = torch.vstack(predict(x_test, t_test, model)).cpu().detach().numpy()
     targets = get_ref_solutions(pde_name, pde_coefs, x_test, t_test, data_params_test)
     test_l1re = l1_relative_error(predictions, targets)
     test_l2re = l2_relative_error(predictions, targets)
 
-    wandb.log({'train/l1re': train_l1re,
-                'train/l2re': train_l2re,
+    wandb.log({'train/l1re': train_l1re, 
+                'train/l2re': train_l2re, 
                 'test/l1re': test_l1re, 
                 'test/l2re': test_l2re})
     
