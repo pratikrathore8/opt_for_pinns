@@ -175,8 +175,8 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
     
     elif pde_name == "reaction": 
         def compute_sol(x, t): 
-            initial_func_term = np.exp(-(1/2) * np.square((x.cpu().detach().numpy() - np.pi) / (np.pi / 4))).flatten()
-            exp_term = np.exp(pde_coefs['rho'] * t.cpu().detach().numpy())
+            initial_func_term = np.exp(-(1/2) * np.square((x - np.pi) / (np.pi / 4)))
+            exp_term = np.exp(pde_coefs['rho'] * t)
             return initial_func_term * exp_term / (initial_func_term * exp_term + 1 - initial_func_term)
         
         sol = np.vstack([compute_sol(x[i].cpu().detach().numpy(), t[i].cpu().detach().numpy()) for i in range(len(x))])
