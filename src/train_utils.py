@@ -59,9 +59,9 @@ def get_pde(pde_name, pde_params_list, loss_name):
             loss_bc = loss_type["bc"](outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
             loss_ic = loss_type["ic"](outputs_left[:,0], torch.sin(x_left[:,0]))
 
-            loss = loss_res + loss_bc + loss_ic
+            # loss = loss_res + loss_bc + loss_ic
 
-            return loss
+            return loss_res, loss_bc, loss_ic
 
     elif pde_name == "reaction_diffusion": 
         if not {"nu", "rho"} <= pde_coefs.keys(): 
@@ -83,9 +83,9 @@ def get_pde(pde_name, pde_params_list, loss_name):
             loss_bc = loss_type["bc"](outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
             loss_ic = loss_type["ic"](outputs_left[:,0], torch.exp(-(1/2) * torch.square((x_left[:,0] - np.pi) / (np.pi / 4))))
 
-            loss = loss_res + loss_bc + loss_ic
+            # loss = loss_res + loss_bc + loss_ic
 
-            return loss
+            return loss_res, loss_bc, loss_ic
 
     elif pde_name == "reaction": 
         if "rho" not in pde_coefs.keys(): 
@@ -105,9 +105,9 @@ def get_pde(pde_name, pde_params_list, loss_name):
             loss_bc = loss_type["bc"](outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
             loss_ic = loss_type["ic"](outputs_left[:,0], torch.exp(-(1/2) * torch.square((x_left[:,0] - np.pi) / (np.pi / 4))))
 
-            loss = loss_res + loss_bc + loss_ic
+            # loss = loss_res + loss_bc + loss_ic
 
-            return loss
+            return loss_res, loss_bc, loss_ic
 
     else: 
         raise RuntimeError("{} is not a valid PDE name.".format(pde_name))
@@ -423,7 +423,12 @@ def train(model,
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
 
-    wandb.log({'loss': loss_func(x, t, predict(x, t, model))})
+    loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
+    loss = loss_res + loss_bc + loss_ic
+    wandb.log({'loss': loss.item(),
+            'loss_res': loss_res.item(),
+            'loss_bc': loss_bc.item(),
+            'loss_ic': loss_ic.item()})
 
     weights_hist = []
     weights_hist.append([p.detach().cpu().numpy() for p in model.parameters()])
@@ -433,7 +438,8 @@ def train(model,
         def closure():
             opt.zero_grad()
             outputs = predict(x, t, model)
-            loss = loss_func(x, t, outputs)
+            loss_res, loss_bc, loss_ic = loss_func(x, t, outputs)
+            loss = loss_res + loss_bc + loss_ic
             loss.backward()
 
             return loss
@@ -443,7 +449,13 @@ def train(model,
         model.eval()
         weights_hist.append([p.detach().cpu().numpy()
                             for p in model.parameters()])
-        wandb.log({'loss': loss_func(x, t, predict(x, t, model))})
+        loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
+        loss = loss_res + loss_bc + loss_ic
+
+        wandb.log({'loss': loss.item(),
+            'loss_res': loss_res.item(),
+            'loss_bc': loss_bc.item(),
+            'loss_ic': loss_ic.item()})
     
     # evaluate errors
     with torch.no_grad():
