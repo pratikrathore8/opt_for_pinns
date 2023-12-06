@@ -87,6 +87,28 @@ def get_pde(pde_name, pde_params_list, loss_name):
 
             return loss
 
+    elif pde_name == "reaction": 
+        if "rho" not in pde_coefs.keys(): 
+            raise KeyError("rho is not specified for reaction PDE.")
+
+        x_range = [0, 2 * np.pi]
+        t_range = [0, 1]
+
+        def loss_func(x, t, pred): 
+            x_res, x_left, x_upper, x_lower = x
+            t_res, t_left, t_upper, t_lower = t
+            outputs_res, outputs_left, outputs_upper, outputs_lower = pred
+
+            u_t = torch.autograd.grad(outputs_res, t_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+
+            loss_res = loss_type["res"](u_t - pde_coefs["rho"] * outputs_res * (1 - outputs_res), torch.zeros_like(u_t))
+            loss_bc = loss_type["bc"](outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
+            loss_ic = loss_type["ic"](outputs_left[:,0], torch.exp(-(1/2) * torch.square((x_left[:,0] - np.pi) / (np.pi / 4))))
+
+            loss = loss_res + loss_bc + loss_ic
+
+            return loss
+
     else: 
         raise RuntimeError("{} is not a valid PDE name.".format(pde_name))
 
@@ -107,6 +129,7 @@ OUTPUT:
 def get_ref_solutions(pde_name, pde_coefs, x, t, data_params): 
     if pde_name == "convection": 
         sol = np.vstack([np.sin(x[i].cpu().detach().numpy() - pde_coefs["beta"] * t[i].cpu().detach().numpy()) for i in range(len(x))])
+    
     elif pde_name == "reaction_diffusion": 
         # unpack data-generation parameters
         x_range = data_params["x_range"]
@@ -149,6 +172,14 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
         sol_res = u[1:-1, 1:].T.reshape(-1,1)[res_idx]
 
         sol = np.vstack([sol_res, sol_left, sol_upper, sol_lower])
+    
+    elif pde_name == "reaction": 
+        def compute_sol(x, t): 
+            initial_func_term = np.exp(-(1/2) * np.square((x.cpu().detach().numpy() - np.pi) / (np.pi / 4))).flatten()
+            exp_term = np.exp(pde_coefs['rho'] * t.cpu().detach().numpy())
+            return initial_func_term * exp_term / (initial_func_term * exp_term + 1 - initial_func_term)
+        
+        sol = np.vstack([compute_sol(x[i].cpu().detach().numpy(), t[i].cpu().detach().numpy()) for i in range(len(x))])
 
     else: 
         raise RuntimeError("{} is not a valid PDE name.".format(pde_name))
