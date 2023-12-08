@@ -3,3 +3,4 @@ opt_for_pinns_env/
 *.pdf
 *.apng
 wandb/
+*temp/

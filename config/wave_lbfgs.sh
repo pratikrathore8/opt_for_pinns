@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pde=convection
+pde=wave
 seeds=(123 234 345 456 567 678 789 890)
 losses=(mse)
 n_neurons=(50 100 200 400 800)
@@ -10,9 +10,9 @@ num_t=101
 num_res=10000
 opt=lbfgs
 epochs=1000
-betas=(1 10 20 30 40)
+betas=(1 2 3 4 5)
 devices=(4 5 6 7)
-proj=convection_lbfgs_v3
+proj=wave_lbfgs
 max_parallel_jobs=4
 
 background_pids=()
