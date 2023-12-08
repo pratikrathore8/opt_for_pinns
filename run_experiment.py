@@ -75,6 +75,8 @@ def main():
     print("Optimizer to use: {}".format(experiment_args["opt"]))
     print("Specified optimizer parameters: {}".format(
         experiment_args["opt_params"]))
+    print("Number of layers: {}".format(experiment_args["num_layers"]))
+    print("Number of neurons per layer: {}".format(experiment_args["num_neurons"]))
     print("Number of spatial points (x): {}".format(experiment_args["num_x"]))
     print("Number of temporal points (t): {}".format(experiment_args["num_t"]))
     print("Number of random residual points to sample: {}".format(experiment_args["num_res"]))

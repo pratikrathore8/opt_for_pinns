@@ -6,7 +6,6 @@ import random
 import re
 import wandb
 import os
-import shutil
 import bz2
 import pickle
 
@@ -109,6 +108,35 @@ def get_pde(pde_name, pde_params_list, loss_name):
 
             return loss_res, loss_bc, loss_ic
 
+    elif pde_name == "wave":
+        if "beta" not in pde_coefs.keys():
+            raise KeyError("beta is not specified for wave PDE.")
+
+        x_range = [0, 1]
+        t_range = [0, 1]
+
+        def loss_func(x, t, pred):
+            x_res, x_left, x_upper, x_lower = x
+            t_res, t_left, t_upper, t_lower = t
+            outputs_res, outputs_left, outputs_upper, outputs_lower = pred
+
+            u_x = torch.autograd.grad(outputs_res, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+            u_xx = torch.autograd.grad(u_x, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+            u_t = torch.autograd.grad(outputs_res, t_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+            u_tt = torch.autograd.grad(u_t, t_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+
+            loss_res = loss_type["res"](u_tt - 4 * u_xx, torch.zeros_like(u_tt))
+            loss_bc = loss_type["bc"](outputs_upper, torch.zeros_like(outputs_upper)) + loss_type["bc"](outputs_lower, torch.zeros_like(outputs_lower))
+
+            ui_t = torch.autograd.grad(outputs_left, t_left, grad_outputs=torch.ones_like(outputs_left), retain_graph=True, create_graph=True)[0]
+
+            loss_ic_1 = loss_type["ic"](outputs_left[:,0], torch.sin(np.pi * x_left[:,0]) + 0.5 * torch.sin(pde_coefs["beta"] * np.pi * x_left[:,0]))
+            loss_ic_2 = loss_type["ic"](ui_t, torch.zeros_like(ui_t))
+
+            loss_ic = loss_ic_1 + loss_ic_2
+
+            return loss_res, loss_bc, loss_ic
+
     else: 
         raise RuntimeError("{} is not a valid PDE name.".format(pde_name))
 
@@ -179,6 +207,13 @@ def get_ref_solutions(pde_name, pde_coefs, x, t, data_params):
             exp_term = np.exp(pde_coefs['rho'] * t)
             return initial_func_term * exp_term / (initial_func_term * exp_term + 1 - initial_func_term)
         
+        sol = np.vstack([compute_sol(x[i].cpu().detach().numpy(), t[i].cpu().detach().numpy()) for i in range(len(x))])
+
+    elif pde_name == "wave":
+        def compute_sol(x, t):
+            return np.sin(np.pi * x) * np.cos(2 * np.pi * t) \
+                + 0.5 * np.sin(pde_coefs["beta"] * np.pi * x) * np.cos(2 * pde_coefs["beta"] * np.pi * t)
+
         sol = np.vstack([compute_sol(x[i].cpu().detach().numpy(), t[i].cpu().detach().numpy()) for i in range(len(x))])
 
     else: 
