@@ -8,7 +8,6 @@ import torch
 from src.train_utils import set_random_seed, train
 from src.models import PINN
 
-
 def main():
     # Parse arguments
     parser = argparse.ArgumentParser()

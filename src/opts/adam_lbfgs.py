@@ -12,7 +12,6 @@ class Adam_LBFGS(Optimizer):
 
         self.state['epoch'] = 0
 
-
     def step(self, closure=None):
         if self.state['epoch'] < self.switch_epoch:
             self.adam.step(closure)

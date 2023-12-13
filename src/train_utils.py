@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam, LBFGS
+from opts.adam_lbfgs import Adam_LBFGS
 import random
 import re
 import wandb
@@ -228,10 +229,10 @@ INPUT:
 - seed: integer
 """
 def set_random_seed(seed): 
-  np.random.seed(seed)
-  random.seed(seed)
-  torch.manual_seed(seed)
-  torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
 
 """
 Helper function for generating data on a grid. 
@@ -257,62 +258,61 @@ where:
 > res_idx: numpy array of length (x_num-2)(t_num-1) or num_res_samples; corresponding indices of the sampled residual points from the interior grid
 """
 def get_data(x_range, t_range, x_num, t_num, random=False, num_res_samples=1e4, device='cpu'):
-  # generate initial and boundary points
-  x = np.linspace(x_range[0], x_range[1], x_num).reshape(-1, 1)
-  t = np.linspace(t_range[0], t_range[1], t_num).reshape(-1, 1)
-  # initial time
-  x_left = x.copy()
-  t_left = t_range[0] * np.ones([x_num,1])
-  # lower boundary
-  x_lower = x_range[0] * np.ones([t_num,1])
-  t_lower = t.copy()
-  # upper boundary
-  x_upper = x_range[1] * np.ones([t_num,1])
-  t_upper = t.copy()
-  # residual points
-  x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
-  data_params = {
-    "x_range": x_range, 
-    "t_range": t_range, 
-    "x_num": x_num, 
-    "t_num": t_num
-  }
-  if random: 
-    mesh = np.hstack((x_mesh.flatten()[:, None], t_mesh.flatten()[:, None]))
-    idx = np.random.choice(mesh.shape[0], num_res_samples, replace=False)
-    x_res = mesh[idx, 0:1]
-    t_res = mesh[idx, 1:2]
-    data_params["res_idx"] = idx
-  else: 
-    x_res = x_mesh.reshape(-1,1)
-    t_res = t_mesh.reshape(-1,1)
-    data_params["res_idx"] = np.arange((x_num - 2) * (t_num - 1))
+    # generate initial and boundary points
+    x = np.linspace(x_range[0], x_range[1], x_num).reshape(-1, 1)
+    t = np.linspace(t_range[0], t_range[1], t_num).reshape(-1, 1)
+    # initial time
+    x_left = x.copy()
+    t_left = t_range[0] * np.ones([x_num,1])
+    # lower boundary
+    x_lower = x_range[0] * np.ones([t_num,1])
+    t_lower = t.copy()
+    # upper boundary
+    x_upper = x_range[1] * np.ones([t_num,1])
+    t_upper = t.copy()
+    # residual points
+    x_mesh, t_mesh = np.meshgrid(x[1:-1], t[1:])
+    data_params = {
+        "x_range": x_range, 
+        "t_range": t_range, 
+        "x_num": x_num, 
+        "t_num": t_num
+    }
+    if random: 
+        mesh = np.hstack((x_mesh.flatten()[:, None], t_mesh.flatten()[:, None]))
+        idx = np.random.choice(mesh.shape[0], num_res_samples, replace=False)
+        x_res = mesh[idx, 0:1]
+        t_res = mesh[idx, 1:2]
+        data_params["res_idx"] = idx
+    else: 
+        x_res = x_mesh.reshape(-1,1)
+        t_res = t_mesh.reshape(-1,1)
+        data_params["res_idx"] = np.arange((x_num - 2) * (t_num - 1))
 
-  # move data to target device
-  if device != 'cpu': 
-    x_left = torch.tensor(x_left, dtype=torch.float32, requires_grad=True).to(device)
-    t_left = torch.tensor(t_left, dtype=torch.float32, requires_grad=True).to(device)
-    x_upper = torch.tensor(x_upper, dtype=torch.float32, requires_grad=True).to(device)
-    t_upper = torch.tensor(t_upper, dtype=torch.float32, requires_grad=True).to(device)
-    x_lower = torch.tensor(x_lower, dtype=torch.float32, requires_grad=True).to(device)
-    t_lower = torch.tensor(t_lower, dtype=torch.float32, requires_grad=True).to(device)
-    x_res = torch.tensor(x_res, dtype=torch.float32, requires_grad=True).to(device)
-    t_res = torch.tensor(t_res, dtype=torch.float32, requires_grad=True).to(device)
+    # move data to target device
+    if device != 'cpu': 
+        x_left = torch.tensor(x_left, dtype=torch.float32, requires_grad=True).to(device)
+        t_left = torch.tensor(t_left, dtype=torch.float32, requires_grad=True).to(device)
+        x_upper = torch.tensor(x_upper, dtype=torch.float32, requires_grad=True).to(device)
+        t_upper = torch.tensor(t_upper, dtype=torch.float32, requires_grad=True).to(device)
+        x_lower = torch.tensor(x_lower, dtype=torch.float32, requires_grad=True).to(device)
+        t_lower = torch.tensor(t_lower, dtype=torch.float32, requires_grad=True).to(device)
+        x_res = torch.tensor(x_res, dtype=torch.float32, requires_grad=True).to(device)
+        t_res = torch.tensor(t_res, dtype=torch.float32, requires_grad=True).to(device)
 
-  # form tuples
-  x = (x_res, x_left, x_upper, x_lower)
-  t = (t_res, t_left, t_upper, t_lower)
+    # form tuples
+    x = (x_res, x_left, x_upper, x_lower)
+    t = (t_res, t_left, t_upper, t_lower)
 
-  return x, t, data_params
+    return x, t, data_params
 
 """
 Helper function for initializing neural net parameters. 
 """
 def init_weights(m):
-  if isinstance(m, nn.Linear):
-    # torch.nn.init.xavier_uniform_(m.weight)
-    torch.nn.init.xavier_normal_(m.weight)
-    m.bias.data.fill_(0.0)
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_normal_(m.weight)
+        m.bias.data.fill_(0.0)
 
 """
 Helper function for making predictions with PINN. 
@@ -330,7 +330,6 @@ where:
 > pred_lower: predictions on lower boundary points
 """
 def predict(x, t, model): 
-
     x_res, x_left, x_upper, x_lower = x
     t_res, t_left, t_upper, t_lower = t
     
@@ -384,6 +383,13 @@ def get_opt(opt_name, opt_params, model_params):
         if "history_size" in opt_params:
             opt_params["history_size"] = int(opt_params["history_size"])
         return LBFGS(model_params, **opt_params, line_search_fn='strong_wolfe')
+    elif opt_name == 'adam_lbfgs':
+        if "switch_epoch" not in opt_params:
+            raise KeyError("switch_epoch is not specified for Adam_LBFGS optimizer.")
+        switch_epoch = opt_params["switch_epoch"]
+        adam_params = {k: v for k, v in opt_params.items() if k.startswith("adam_")}
+        lbfgs_params = {k: v for k, v in opt_params.items() if k.startswith("lbfgs_")}
+        return Adam_LBFGS(model_params, switch_epoch, adam_params, lbfgs_params)
     else:
         raise ValueError(f'Optimizer {opt_name} not supported')
 
