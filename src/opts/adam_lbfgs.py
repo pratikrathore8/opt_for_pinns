@@ -2,13 +2,14 @@ from torch.optim import Adam, LBFGS, Optimizer
 
 class Adam_LBFGS(Optimizer):
     def __init__(self, params, switch_epoch, adam_params, lbfgs_params):
-        defaults = dict(switch_epoch=switch_epoch, adam_params=adam_params, lbfgs_params=lbfgs_params)
+        # defaults = dict(switch_epoch=switch_epoch, adam_params=adam_params, lbfgs_params=lbfgs_params)
 
         self.switch_epoch = switch_epoch
-        self.adam = Adam(params, **adam_params)
-        self.lbfgs = LBFGS(params, **lbfgs_params)
+        self.params = list(params)
+        self.adam = Adam(self.params, **adam_params)
+        self.lbfgs = LBFGS(self.params, **lbfgs_params)
 
-        super(Adam_LBFGS, self).__init__(params, defaults)
+        super(Adam_LBFGS, self).__init__(self.params, defaults={})
 
         self.state['epoch'] = 0
 

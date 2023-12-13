@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam, LBFGS
-from opts.adam_lbfgs import Adam_LBFGS
+from .opts.adam_lbfgs import Adam_LBFGS
 import random
 import re
 import wandb
@@ -387,8 +387,17 @@ def get_opt(opt_name, opt_params, model_params):
         if "switch_epoch" not in opt_params:
             raise KeyError("switch_epoch is not specified for Adam_LBFGS optimizer.")
         switch_epoch = opt_params["switch_epoch"]
-        adam_params = {k: v for k, v in opt_params.items() if k.startswith("adam_")}
-        lbfgs_params = {k: v for k, v in opt_params.items() if k.startswith("lbfgs_")}
+
+        # Get parameters for Adam and LBFGS, remove the prefix "adam_" and "lbfgs_" from the keys
+        adam_params = {k[5:]: v for k, v in opt_params.items() if k.startswith("adam_")}
+        lbfgs_params = {k[6:]: v for k, v in opt_params.items() if k.startswith("lbfgs_")}
+        
+        # If max_iter or history_size is specified, convert them to integers
+        if "max_iter" in lbfgs_params:
+            lbfgs_params["max_iter"] = int(lbfgs_params["max_iter"])
+        if "history_size" in lbfgs_params:
+            lbfgs_params["history_size"] = int(lbfgs_params["history_size"])
+
         return Adam_LBFGS(model_params, switch_epoch, adam_params, lbfgs_params)
     else:
         raise ValueError(f'Optimizer {opt_name} not supported')
@@ -493,10 +502,17 @@ def train(model,
         loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
         loss = loss_res + loss_bc + loss_ic
 
+        # Compute the gradient norm
+        grad_norm = 0
+        for p in model.parameters():
+            grad_norm += p.grad.norm().item() ** 2
+        grad_norm = grad_norm ** 0.5
+
         wandb.log({'loss': loss.item(),
             'loss_res': loss_res.item(),
             'loss_bc': loss_bc.item(),
-            'loss_ic': loss_ic.item()})
+            'loss_ic': loss_ic.item(),
+            'grad_norm': grad_norm})
     
     # evaluate errors
     with torch.no_grad():
