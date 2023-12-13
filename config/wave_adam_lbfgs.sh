@@ -71,3 +71,9 @@ do
         done
     done
 done
+
+# Wait for all background jobs to complete
+wait
+
+# Cleanup on normal exit
+cleanup
