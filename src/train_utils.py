@@ -515,10 +515,10 @@ def train(model,
                 'test/l2re': test_l2re})
     
     # Save weights history as bz2 file
-    filename = os.path.join(save_folder, 'weights_history.bz2')
-    serialized_data = pickle.dumps(weights_hist)
-    with bz2.open(filename, 'wb') as f:
-        f.write(serialized_data)
+    # filename = os.path.join(save_folder, 'weights_history.bz2')
+    # serialized_data = pickle.dumps(weights_hist)
+    # with bz2.open(filename, 'wb') as f:
+    #     f.write(serialized_data)
 
     # Save file to wandb
     # wandb.save(os.path.abspath(filename))
