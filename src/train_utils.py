@@ -502,7 +502,8 @@ def train(model,
         loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
         loss = loss_res + loss_bc + loss_ic
 
-        # Compute the gradient norm
+        # Compute the gradient norm of the full objective function
+        # NOTE: This will not work if we do minibatching
         grad_norm = 0
         for p in model.parameters():
             grad_norm += p.grad.norm().item() ** 2
