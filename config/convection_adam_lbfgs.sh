@@ -64,7 +64,6 @@ do
                                     unset 'background_pids[$i]'
                                 fi
                             done
-                            background_pids=("${background_pids[@]}")
                         done
                     fi
                 done
