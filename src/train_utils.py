@@ -469,9 +469,9 @@ def train(model,
     wandb.log({'x': x, 't': t}) # Log training set
 
     # Store initial weights and loss
-    save_folder = os.path.join(os.path.abspath(f'./{proj_name}_temp'), wandb.run.id)
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
+    # save_folder = os.path.join(os.path.abspath(f'./{proj_name}_temp'), wandb.run.id)
+    # if not os.path.exists(save_folder):
+    #     os.makedirs(save_folder)
 
     loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
     loss = loss_res + loss_bc + loss_ic
@@ -480,8 +480,8 @@ def train(model,
             'loss_bc': loss_bc.item(),
             'loss_ic': loss_ic.item()})
 
-    weights_hist = []
-    weights_hist.append([p.detach().cpu().numpy() for p in model.parameters()])
+    # weights_hist = []
+    # weights_hist.append([p.detach().cpu().numpy() for p in model.parameters()])
     
     for i in range(num_epochs):
         model.train()
@@ -497,8 +497,8 @@ def train(model,
 
         # record model parameters and loss
         model.eval()
-        weights_hist.append([p.detach().cpu().numpy()
-                            for p in model.parameters()])
+        # weights_hist.append([p.detach().cpu().numpy()
+        #                     for p in model.parameters()])
         loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
         loss = loss_res + loss_bc + loss_ic
 

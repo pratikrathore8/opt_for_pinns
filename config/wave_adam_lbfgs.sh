@@ -13,9 +13,9 @@ switch_epoch=1000
 adam_lrs=(0.00001 0.0001 0.001 0.01 0.1)
 epochs=3000
 betas=(1 2 3 4 5)
-devices=(4 5 6 7)
+devices=(1 2 3 4 5 6 7)
 proj=wave_adam_lbfgs
-max_parallel_jobs=4
+max_parallel_jobs=7
 
 background_pids=()
 current_device=0

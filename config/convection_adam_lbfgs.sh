@@ -13,7 +13,7 @@ switch_epoch=1000
 adam_lrs=(0.00001 0.0001 0.001 0.01 0.1)
 epochs=2000
 betas=(1 10 20 30 40)
-devices=(1 2 3 4 5 6 7)
+devices=(4 5 6 7)
 proj=convection_adam_lbfgs_v3
 max_parallel_jobs=4
 
