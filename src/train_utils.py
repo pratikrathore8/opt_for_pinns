@@ -391,6 +391,7 @@ def get_opt(opt_name, opt_params, model_params):
         # Get parameters for Adam and LBFGS, remove the prefix "adam_" and "lbfgs_" from the keys
         adam_params = {k[5:]: v for k, v in opt_params.items() if k.startswith("adam_")}
         lbfgs_params = {k[6:]: v for k, v in opt_params.items() if k.startswith("lbfgs_")}
+        lbfgs_params["line_search_fn"] = "strong_wolfe"
         
         # If max_iter or history_size is specified, convert them to integers
         if "max_iter" in lbfgs_params:
