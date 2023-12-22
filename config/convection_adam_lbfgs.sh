@@ -11,10 +11,10 @@ num_res=10000
 opt=adam_lbfgs
 switch_epoch=1000
 adam_lrs=(0.00001 0.0001 0.001 0.01 0.1)
-epochs=2000
+epochs=5000
 betas=(1 10 20 30 40)
 devices=(4 5 6 7)
-proj=convection_adam_lbfgs_v3
+proj=convection_adam_lbfgs_v3_longer
 max_parallel_jobs=4
 
 background_pids=()
