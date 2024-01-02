@@ -46,7 +46,7 @@ def _nystrom_pcg(hess, b, x, mu, U, S, r, tol, max_iters):
 
 class NysNewtonCG(Optimizer):
     def __init__(self, params, lr=1.0, rank=10, mu=1e-4, chunk_size=1,
-                 cg_tol=1e-10, cg_max_iters=100, line_search_fn=None, verbose=False):
+                 cg_tol=1e-16, cg_max_iters=1000, line_search_fn=None, verbose=False):
         defaults = dict(lr=lr, rank=rank, chunk_size=chunk_size, mu=mu, cg_tol=cg_tol,
                         cg_max_iters=cg_max_iters, line_search_fn=line_search_fn)
         self.rank = rank
