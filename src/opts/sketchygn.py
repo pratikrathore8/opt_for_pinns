@@ -85,10 +85,10 @@ class SketchyGN(Optimizer):
 
         return loss
 
-    def update_sketch(self, v_flat, bsz):
+    def update_sketch(self, v_flat_list, bsz):
         # Flatten the vector given by v
         # v_flat = torch.cat([component.view(-1) for component in v])
-        p = v_flat.shape[0]
+        p = v_flat_list[0].shape[0]
 
         # If the test matrix has not been initialized, initialize it
         if not self.init_test_matrix:
@@ -100,8 +100,13 @@ class SketchyGN(Optimizer):
             self.init_test_matrix = True
 
         # Update the sketch
-        PhiTv = torch.mv(self.Phi.t(), v_flat)
-        vvTPhi = torch.outer(v_flat, PhiTv)
+        vvTPhi = torch.zeros((p, self.rank), device=self.param_groups[0]['params'][0].device)
+        for v_flat in v_flat_list:
+            PhiTv = torch.mv(self.Phi.t(), v_flat)
+            vvTPhi += torch.outer(v_flat, PhiTv)
+
+        # PhiTv = torch.mv(self.Phi.t(), v_flat)
+        # vvTPhi = torch.outer(v_flat, PhiTv)
         self.sketch = self.beta * self.sketch + (1 - self.beta) * bsz * vvTPhi
         self.n_sketch_upd += 1
 
