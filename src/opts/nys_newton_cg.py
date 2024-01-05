@@ -21,26 +21,31 @@ def _nystrom_pcg(hess, b, x, mu, U, S, r, tol, max_iters):
     S_mu_inv = (S + mu) ** (-1)
 
     resid = b - (hess(x) + mu * x)
-    z = _apply_nys_precond_inv(U, S_mu_inv, mu, lambd_r, resid)
-    p = z.clone()
+    with torch.no_grad():
+        z = _apply_nys_precond_inv(U, S_mu_inv, mu, lambd_r, resid)
+        p = z.clone()
 
     i = 0
 
     while torch.norm(resid) > tol and i < max_iters:
         v = hess(p) + mu * p
-        alpha = torch.dot(resid, z) / torch.dot(p, v)
-        x += alpha * p
+        with torch.no_grad():
+            alpha = torch.dot(resid, z) / torch.dot(p, v)
+            x += alpha * p
 
-        rTz = torch.dot(resid, z)
-        resid -= alpha * v
-        z = _apply_nys_precond_inv(U, S_mu_inv, mu, lambd_r, resid)
-        beta = torch.dot(resid, z) / rTz
+            rTz = torch.dot(resid, z)
+            resid -= alpha * v
+            z = _apply_nys_precond_inv(U, S_mu_inv, mu, lambd_r, resid)
+            beta = torch.dot(resid, z) / rTz
 
-        p = z + beta * p
+            p = z + beta * p
+
+        # if i % 100 == 0:
+        #     print(f"PCG iteration {i} complete. Residual norm = {torch.norm(resid)}")
         i += 1
 
     if torch.norm(resid) > tol:
-        print("Warning: PCG did not converge to tolerance")
+        print(f"Warning: PCG did not converge to tolerance. Tolerance was {tol} but norm of residual is {torch.norm(resid)}")
 
     return x
 
@@ -81,16 +86,17 @@ class NysNewtonCG(Optimizer):
         loss = None
         if closure is not None:
             with torch.enable_grad():
-                loss = closure()
+                loss, grad_tuple = closure()
 
-        g = torch.cat([p.grad.view(-1)
-                      for group in self.param_groups for p in group['params'] if p.grad is not None])
-        # g = g.detach()
+        g = torch.cat([grad.view(-1) for grad in grad_tuple if grad is not None])
 
         # one step update
         for group_idx, group in enumerate(self.param_groups):
+            def hvp_temp(x):
+                return self._hvp(g, self._params_list, x)
+
             # Calculate the Newton direction
-            d = _nystrom_pcg(lambda x: self._hvp(g, self._params_list, x), g, self.old_dir,
+            d = _nystrom_pcg(hvp_temp, g, self.old_dir,
                              self.mu, self.U, self.S, self.rank, self.cg_tol, self.cg_max_iters)
 
             # Store the previous direction for warm starting PCG
@@ -105,7 +111,7 @@ class NysNewtonCG(Optimizer):
 
                 def obj_func(x, t, dx):
                     self._add_grad(t, dx)
-                    loss = float(closure())
+                    loss = float(closure()[0])
                     self._set_param(x)
                     return loss
 
@@ -122,13 +128,13 @@ class NysNewtonCG(Optimizer):
                 np = torch.numel(p)
                 dp = d[ls:ls+np].view(p.shape)
                 ls += np
-                if p.grad is None:
-                    continue
+                # if p.grad is None:
+                #     continue
                 p.data.add_(-dp, alpha=t)
 
         self.n_iters += 1
 
-        return loss
+        return loss, g
 
     def update_preconditioner(self, grad_tuple):
         gradsH = torch.cat([gradient.view(-1)
@@ -137,7 +143,7 @@ class NysNewtonCG(Optimizer):
         p = gradsH.shape[0]
         # Generate test matrix (NOTE: This is transposed test matrix)
         Phi = torch.randn(
-            (self.rank, p), device=self._params_list[0].device) / (p ** 0.5)
+            (self.rank, p), device=gradsH.device) / (p ** 0.5)
         Phi = torch.linalg.qr(Phi.t(), mode='reduced')[0].t()
 
         Y = self._hvp_vmap(gradsH, self._params_list)(Phi)
