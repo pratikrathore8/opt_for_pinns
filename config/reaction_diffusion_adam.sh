@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pde=convection
+pde=reaction_diffusion
 seeds=(123 234 345 456 567 678 789 890)
 losses=(mse)
 n_neurons=(50 100 200 400 800)
@@ -11,9 +11,10 @@ num_res=10000
 opt=adam
 lrs=(0.00001 0.0001 0.001 0.01 0.1)
 epochs=81000
-betas=(1 10 20 30 40)
+nus=(1 2 3 4 5)
+rho=5
 devices=(1 2 3 4 5 6 7)
-proj=convection_adam_final
+proj=reaction_diffusion_adam_final
 max_parallel_jobs=7
 
 background_pids=()
@@ -39,7 +40,7 @@ do
     do
         for n_neuron in "${n_neurons[@]}"
         do
-            for beta in "${betas[@]}"
+            for nu in "${nus[@]}"
             do
                 for lr in "${lrs[@]}"
                 do
@@ -47,7 +48,7 @@ do
                         device=${devices[current_device]}
                         current_device=$(( (current_device + 1) % ${#devices[@]} ))
 
-                        python run_experiment.py --seed $seed --pde $pde --pde_params beta $beta --opt $opt \
+                        python run_experiment.py --seed $seed --pde $pde --pde_params nu $nu rho $rho --opt $opt \
                             --opt_params lr $lr --num_layers $n_layers --num_neurons $n_neuron \
                             --loss $loss --num_x $num_x --num_t $num_t --num_res $num_res --epochs $epochs --wandb_project $proj \
                             --device $device &

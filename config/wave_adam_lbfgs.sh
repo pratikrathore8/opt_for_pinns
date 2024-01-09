@@ -9,12 +9,12 @@ num_x=257
 num_t=101
 num_res=10000
 opt=adam_lbfgs
-switch_epoch=1000
+switch_epochs=1000
 adam_lrs=(0.00001 0.0001 0.001 0.01 0.1)
 epochs=5000
 betas=(1 2 3 4 5)
 devices=(1 2 3 4 5 6 7)
-proj=wave_adam_lbfgs_longer
+proj=wave_adam_lbfgs_final
 max_parallel_jobs=7
 
 background_pids=()
@@ -49,7 +49,7 @@ do
                         current_device=$(( (current_device + 1) % ${#devices[@]} ))
 
                         python run_experiment.py --seed $seed --pde $pde --pde_params beta $beta --opt $opt \
-                            --opt_params switch_epoch $switch_epoch adam_lr $adam_lr lbfgs_history_size 100 --num_layers $n_layers --num_neurons $n_neuron \
+                            --opt_params switch_epochs $switch_epoch adam_lr $adam_lr lbfgs_history_size 100 --num_layers $n_layers --num_neurons $n_neuron \
                             --loss $loss --num_x $num_x --num_t $num_t --num_res $num_res --epochs $epochs --wandb_project $proj \
                             --device $device &
 

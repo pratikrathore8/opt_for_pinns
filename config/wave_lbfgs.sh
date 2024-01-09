@@ -9,11 +9,11 @@ num_x=257
 num_t=101
 num_res=10000
 opt=lbfgs
-epochs=2000
+epochs=4050
 betas=(1 2 3 4 5)
-devices=(4 5 6 7)
-proj=wave_lbfgs
-max_parallel_jobs=4
+devices=(1 2 3 4 5 6 7)
+proj=wave_lbfgs_final
+max_parallel_jobs=7
 
 background_pids=()
 current_device=0
