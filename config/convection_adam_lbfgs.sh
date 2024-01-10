@@ -1,9 +1,9 @@
 #!/bin/bash
 
 pde=convection
-seeds=(123 234 345 456 567 678 789 890)
+seeds=(123 234 345 456 567)
 losses=(mse)
-n_neurons=(50 100 200 400 800)
+n_neurons=(50 100 200 400)
 n_layers=4
 num_x=257
 num_t=101
@@ -11,11 +11,11 @@ num_res=10000
 opt=adam_lbfgs
 switch_epochs=1000
 adam_lrs=(0.00001 0.0001 0.001 0.01 0.1)
-epochs=5000
+epochs=3000
 betas=(1 10 20 30 40)
-devices=(1 2 3 4 5 6 7)
+devices=(3 4 5 6 7)
 proj=convection_adam_lbfgs_final
-max_parallel_jobs=7
+max_parallel_jobs=5
 
 background_pids=()
 current_device=0

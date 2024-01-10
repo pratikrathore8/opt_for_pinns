@@ -1,20 +1,20 @@
 #!/bin/bash
 
 pde=reaction_diffusion
-seeds=(123 234 345 456 567 678 789 890)
+seeds=(123 234 345 456 567)
 losses=(mse)
-n_neurons=(50 100 200 400 800)
+n_neurons=(50 100 200 400)
 n_layers=4
 num_x=257
 num_t=101
 num_res=10000
 opt=lbfgs
-epochs=4050
-nus=(1 2 3 4 5)
+epochs=2050
+nus=(2 3 4 5 6)
 rho=5
-devices=(1 2 3 4 5 6 7)
+devices=(3 4 5 6 7)
 proj=reaction_diffusion_lbfgs_final
-max_parallel_jobs=7
+max_parallel_jobs=5
 
 background_pids=()
 current_device=0
