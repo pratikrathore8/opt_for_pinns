@@ -11,6 +11,8 @@ import os
 import bz2
 import pickle
 
+LOG_FREQ = 20 # Hard-coded for now -- this is done to match the max_iter of the LBFGS optimizer + save time
+
 """
 Helper function for obtaining corresponding domain and loss function of the chosen PDE type. 
 
@@ -486,6 +488,39 @@ OUTPUT:
 def get_opt_params(opt_params_list): 
     return parse_params_list(opt_params_list)
 
+"""
+Helper function for getting the list of logging times.
+
+INPUT:
+- opt: optimizer to be used
+- log_freq: integer; logging frequency
+OUTPUT:
+- log_times: list of positive integers; logging times
+"""
+# TODO: Make this robust to when log_freq does not match the max_iter of the LBFGS optimizer
+def get_log_times(opt, log_freq, num_epochs):
+    log_times = []
+    if isinstance(opt, Adam_LBFGS_NNCG):
+        # Get times up to opt.switch_epoch1, starting at log_freq (Adam)
+        log_times = list(range(log_freq - 1, opt.switch_epoch1, log_freq))
+        # Get times up to opt.switch_epoch2 (possibly including opt.switch_epoch2), starting at opt.switch_epoch1 (L-BFGS)
+        log_times += list(range(opt.switch_epoch1, opt.switch_epoch2, 1))
+        # Get times up to num_epochs (possibly including num_epochs), starting at opt.switch_epoch2 (NNCG)
+        log_times += list(range(opt.switch_epoch2 + log_freq - 1, num_epochs, log_freq))
+    elif isinstance(opt, Adam_LBFGS):
+        # Get times up to opt.switch_epochs[0], starting at log_freq (Adam)
+        log_times = list(range(log_freq - 1, opt.switch_epochs[0], log_freq))
+        # Get times up to num_epochs (possibly including num_epochs), starting at opt.switch_epochs[0] (L-BFGS)
+        log_times += list(range(opt.switch_epochs[0], num_epochs, 1))
+    elif isinstance(opt, Adam):
+        # Get times up to num_epochs (possibly including num_epochs), starting at log_freq (Adam)
+        log_times = list(range(log_freq - 1, num_epochs, log_freq))
+    elif isinstance(opt, LBFGS):
+        # Get all times up to num_epochs (possibly including num_epochs), starting at 1 (L-BFGS)
+        log_times = list(range(0, num_epochs, 1))
+
+    return log_times
+
 def train(model,
           proj_name,
           pde_name,
@@ -505,15 +540,12 @@ def train(model,
     opt_params = get_opt_params(opt_params_list)
     opt = get_opt(opt_name, opt_params, model.parameters())
 
+    logging_times = get_log_times(opt, LOG_FREQ, num_epochs)
+
     # TODO: Account for different values of batch_size
 
     x, t, data_params = get_data(x_range, t_range, n_x, n_t, random=True, num_res_samples=n_res, device=device)
     wandb.log({'x': x, 't': t}) # Log training set
-
-    # Store initial weights and loss
-    # save_folder = os.path.join(os.path.abspath(f'./{proj_name}_temp'), wandb.run.id)
-    # if not os.path.exists(save_folder):
-    #     os.makedirs(save_folder)
 
     loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
     loss = loss_res + loss_bc + loss_ic
@@ -521,9 +553,6 @@ def train(model,
             'loss_res': loss_res.item(),
             'loss_bc': loss_bc.item(),
             'loss_ic': loss_ic.item()})
-
-    # weights_hist = []
-    # weights_hist.append([p.detach().cpu().numpy() for p in model.parameters()])
     
     for i in range(num_epochs):
         model.train()
@@ -563,30 +592,29 @@ def train(model,
 
         # record model parameters and loss
         model.eval()
-        # weights_hist.append([p.detach().cpu().numpy()
-        #                     for p in model.parameters()])
-        loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
-        loss = loss_res + loss_bc + loss_ic
+        if i in logging_times:
+            loss_res, loss_bc, loss_ic = loss_func(x, t, predict(x, t, model))
+            loss = loss_res + loss_bc + loss_ic
 
-        # Compute the gradient norm of the full objective function
-        # NOTE: This will not work if we do minibatching
-        if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
-            grad_norm = torch.norm(grad).item()
-        else:
-            grad_norm = 0
-            for p in model.parameters():
-                grad_norm += p.grad.norm().item() ** 2
-            grad_norm = grad_norm ** 0.5
+            # Compute the gradient norm of the full objective function
+            # NOTE: This will not work if we do minibatching
+            if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
+                grad_norm = torch.norm(grad).item()
+            else:
+                grad_norm = 0
+                for p in model.parameters():
+                    grad_norm += p.grad.norm().item() ** 2
+                grad_norm = grad_norm ** 0.5
 
-        if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
-            wandb.log({'step_size': opt.nncg.state_dict()['state'][0]['t']},
-                        commit=False)
+            if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
+                wandb.log({'step_size': opt.nncg.state_dict()['state'][0]['t']},
+                            commit=False)
 
-        wandb.log({'loss': loss.item(),
-            'loss_res': loss_res.item(),
-            'loss_bc': loss_bc.item(),
-            'loss_ic': loss_ic.item(),
-            'grad_norm': grad_norm})
+            wandb.log({'loss': loss.item(),
+                'loss_res': loss_res.item(),
+                'loss_bc': loss_bc.item(),
+                'loss_ic': loss_ic.item(),
+                'grad_norm': grad_norm})
     
     # evaluate errors
     with torch.no_grad():
@@ -609,12 +637,3 @@ def train(model,
                 'train/l2re': train_l2re, 
                 'test/l1re': test_l1re, 
                 'test/l2re': test_l2re})
-    
-    # Save weights history as bz2 file
-    # filename = os.path.join(save_folder, 'weights_history.bz2')
-    # serialized_data = pickle.dumps(weights_hist)
-    # with bz2.open(filename, 'wb') as f:
-    #     f.write(serialized_data)
-
-    # Save file to wandb
-    # wandb.save(os.path.abspath(filename))
