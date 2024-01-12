@@ -49,7 +49,7 @@ do
                         current_device=$(( (current_device + 1) % ${#devices[@]} ))
 
                         python run_experiment.py --seed $seed --pde $pde --pde_params beta $beta --opt $opt \
-                            --opt_params switch_epochs $switch_epoch adam_lr $adam_lr lbfgs_history_size 100 --num_layers $n_layers --num_neurons $n_neuron \
+                            --opt_params switch_epochs $switch_epochs adam_lr $adam_lr lbfgs_history_size 100 --num_layers $n_layers --num_neurons $n_neuron \
                             --loss $loss --num_x $num_x --num_t $num_t --num_res $num_res --epochs $epochs --wandb_project $proj \
                             --device $device &
 
