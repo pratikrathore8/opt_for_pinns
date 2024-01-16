@@ -170,7 +170,7 @@ class precond_hessian():
 
       a_, b_ = torch.linalg.eig(T)
 
-      eigen_list = a_
+      eigen_list = a_.real
       weight_list = torch.pow(b_[0,:], 2) # only stores the square of first component of eigenvectors
       eigen_list_full.append(list(eigen_list.cpu().numpy()))
       weight_list_full.append(list(weight_list.cpu().numpy()))
