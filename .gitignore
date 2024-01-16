@@ -1,5 +1,5 @@
 __pycache__/
-opt_for_pinns_env/
+*env/
 *.pdf
 *.apng
 wandb/
