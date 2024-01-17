@@ -415,9 +415,9 @@ def get_opt(opt_name, opt_params, model_params):
             raise KeyError("switch_epoch_nncg is not specified for Adam_LBFGS_NNCG optimizer.")
         if "precond_update_freq" not in opt_params:
             raise KeyError("precond_update_freq is not specified for Adam_LBFGS_NNCG optimizer.")
-        switch_epoch_lbfgs = opt_params["switch_epoch_lbfgs"]
-        switch_epoch_nncg = opt_params["switch_epoch_nncg"]
-        precond_update_freq = opt_params["precond_update_freq"]
+        switch_epoch_lbfgs = int(opt_params["switch_epoch_lbfgs"])
+        switch_epoch_nncg = int(opt_params["switch_epoch_nncg"])
+        precond_update_freq = int(opt_params["precond_update_freq"])
 
         # Get parameters for Adam, LBFGS, and NNCG, remove the prefix "adam_", "lbfgs_", and "nncg_" from the keys
         adam_params = {k[5:]: v for k, v in opt_params.items() if k.startswith("adam_")}
