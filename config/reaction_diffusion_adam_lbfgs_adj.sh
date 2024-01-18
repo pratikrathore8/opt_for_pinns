@@ -15,7 +15,7 @@ epochs=12500
 nus=(2 3 4 5 6)
 rho=5
 devices=(3 4 5 6 7)
-proj=reaction_diffusion_adam_lbfgs_final_10k
+proj=reaction_diffusion_adam_lbfgs_final_11k
 max_parallel_jobs=5
 
 background_pids=()

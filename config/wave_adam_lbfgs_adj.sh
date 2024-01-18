@@ -14,7 +14,7 @@ adam_lrs=(0.00001 0.0001 0.001 0.01 0.1)
 epochs=12500
 betas=(1 2 3 4 5)
 devices=(3 4 5 6 7)
-proj=wave_adam_lbfgs_final_10k
+proj=wave_adam_lbfgs_final_11k
 max_parallel_jobs=5
 
 background_pids=()
