@@ -73,7 +73,7 @@ class hessian():
     outputs = self.pred_func(self.x, self.t, self.model)
     loss_res, loss_bc, loss_ic = self.loss_func(self.x, self.t, outputs)
     if loss_comp == "res": 
-      loss = loss_res + nn.MSELoss()(outputs[0] * 0, torch.zeros_like(outputs[0]))  # second term ensures all model parameters are in the graph
+      loss = loss_res + torch.nn.MSELoss()(outputs[0] * 0, torch.zeros_like(outputs[0]))  # second term ensures all model parameters are in the graph
     elif loss_comp == "bc": 
       loss = loss_bc
     elif loss_comp == "ic": 
