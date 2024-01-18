@@ -55,7 +55,7 @@ class precond_hessian():
     outputs = self.pred_func(self.x, self.t, self.model)
     loss_res, loss_bc, loss_ic = self.loss_func(self.x, self.t, outputs)
     if loss_comp == "res": 
-      loss = loss_res + nn.MSELoss()(outputs[0] * 0, torch.zeros_like(outputs[0]))  # second term ensures all model parameters are in the graph
+      loss = loss_res + torch.nn.MSELoss()(outputs[0] * 0, torch.zeros_like(outputs[0]))  # second term ensures all model parameters are in the graph
     elif loss_comp == "bc": 
       loss = loss_bc
     elif loss_comp == "ic": 
@@ -168,10 +168,10 @@ class precond_hessian():
           T[i + 1, i] = beta_list[i]
           T[i, i + 1] = beta_list[i]
 
-      a_, b_ = torch.linalg.eig(T)
+      eigenvalues, eigenvectors = torch.linalg.eig(T)
 
-      eigen_list = a_.real
-      weight_list = torch.pow(b_[0,:], 2) # only stores the square of first component of eigenvectors
+      eigen_list = eigenvalues.real
+      weight_list = torch.pow(eigenvectors[0,:], 2) # only stores the square of first component of eigenvectors
       eigen_list_full.append(list(eigen_list.cpu().numpy()))
       weight_list_full.append(list(weight_list.cpu().numpy()))
 
