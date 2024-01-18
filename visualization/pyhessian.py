@@ -147,7 +147,7 @@ class hessian():
 
       eigenvalues, eigenvectors = torch.linalg.eig(T)
 
-      eigen_list = eigenvalues
+      eigen_list = eigenvalues.real
       weight_list = torch.pow(eigenvectors[0,:], 2)
       eigen_list_full.append(list(eigen_list.cpu().numpy()))
       weight_list_full.append(list(weight_list.cpu().numpy()))
