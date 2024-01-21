@@ -4,12 +4,10 @@ import torch.nn as nn
 from torch.optim import Adam, LBFGS
 from .opts.adam_lbfgs import Adam_LBFGS
 from .opts.adam_lbfgs_nncg import Adam_LBFGS_NNCG
+from .opts.adam_lbfgs_gd import Adam_LBFGS_GD
 import random
 import re
 import wandb
-import os
-import bz2
-import pickle
 
 LOG_FREQ = 20 # Hard-coded for now -- this is done to match the max_iter of the LBFGS optimizer + save time
 
@@ -321,8 +319,8 @@ def init_weights(m):
 Helper function for making predictions with PINN. 
 
 INPUT: 
-- x: tutple of (x_res, x_left, x_upper, x_lower)
-- t: tutple of (t_res, t_left, t_upper, t_lower)
+- x: tuple of (x_res, x_left, x_upper, x_lower)
+- t: tuple of (t_res, t_left, t_upper, t_lower)
 - model: PINN model
 OUTPUT: 
 - preds: tuple of (pred_res, pred_left, pred_upper, pred_lower)
@@ -437,6 +435,28 @@ def get_opt(opt_name, opt_params, model_params):
             nncg_params["rank"] = int(nncg_params["rank"])
 
         return Adam_LBFGS_NNCG(model_params, switch_epoch_lbfgs, switch_epoch_nncg, precond_update_freq, adam_params, lbfgs_params, nncg_params)
+    elif opt_name == 'adam_lbfgs_gd':
+        if "switch_epoch_lbfgs" not in opt_params:
+            raise KeyError("switch_epoch_lbfgs is not specified for Adam_LBFGS_GD optimizer.")
+        if "switch_epoch_gd" not in opt_params:
+            raise KeyError("switch_epoch_gd is not specified for Adam_LBFGS_GD optimizer.")
+        switch_epoch_lbfgs = int(opt_params["switch_epoch_lbfgs"])
+        switch_epoch_gd = int(opt_params["switch_epoch_gd"])
+
+        # Get parameters for Adam, LBFGS, and GD, remove the prefix "adam_", "lbfgs_", and "gd_" from the keys
+        adam_params = {k[5:]: v for k, v in opt_params.items() if k.startswith("adam_")}
+        lbfgs_params = {k[6:]: v for k, v in opt_params.items() if k.startswith("lbfgs_")}
+        gd_params = {k[3:]: v for k, v in opt_params.items() if k.startswith("gd_")}
+        lbfgs_params["line_search_fn"] = "strong_wolfe"
+        gd_params["line_search_fn"] = "armijo"
+
+        # If max_iter or history_size is specified, convert them to integers
+        if "max_iter" in lbfgs_params:
+            lbfgs_params["max_iter"] = int(lbfgs_params["max_iter"])
+        if "history_size" in lbfgs_params:
+            lbfgs_params["history_size"] = int(lbfgs_params["history_size"])
+
+        return Adam_LBFGS_GD(model_params, switch_epoch_lbfgs, switch_epoch_gd, adam_params, lbfgs_params, gd_params)
     else:
         raise ValueError(f'Optimizer {opt_name} not supported')
 
@@ -500,12 +520,12 @@ OUTPUT:
 # TODO: Make this robust to when log_freq does not match the max_iter of the LBFGS optimizer
 def get_log_times(opt, log_freq, num_epochs):
     log_times = []
-    if isinstance(opt, Adam_LBFGS_NNCG):
+    if isinstance(opt, (Adam_LBFGS_NNCG, Adam_LBFGS_GD)):
         # Get times up to opt.switch_epoch1, starting at log_freq (Adam)
         log_times = list(range(log_freq - 1, opt.switch_epoch1, log_freq))
         # Get times up to opt.switch_epoch2 (possibly including opt.switch_epoch2), starting at opt.switch_epoch1 (L-BFGS)
         log_times += list(range(opt.switch_epoch1, opt.switch_epoch2, 1))
-        # Get times up to num_epochs (possibly including num_epochs), starting at opt.switch_epoch2 (NNCG)
+        # Get times up to num_epochs (possibly including num_epochs), starting at opt.switch_epoch2 (NNCG/GD)
         log_times += list(range(opt.switch_epoch2 + log_freq - 1, num_epochs, log_freq))
     elif isinstance(opt, Adam_LBFGS):
         # Get times up to opt.switch_epochs[0], starting at log_freq (Adam)
@@ -567,8 +587,8 @@ def train(model,
                 loss, model.parameters(), create_graph=True)
             opt.nncg.update_preconditioner(grad_tuple)
 
-        # Separate closure is needed for NysNewtonCG
-        if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
+        # Separate closure is needed for NysNewtonCG/GD
+        if isinstance(opt, (Adam_LBFGS_NNCG, Adam_LBFGS_GD)) and i >= opt.switch_epoch2:
             def closure():
                 opt.zero_grad()
                 outputs = predict(x, t, model)
@@ -585,7 +605,7 @@ def train(model,
                 loss.backward()
                 return loss
 
-        if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
+        if isinstance(opt, (Adam_LBFGS_NNCG, Adam_LBFGS_GD)) and i >= opt.switch_epoch2:
             grad = opt.step(closure)
         else:
             opt.step(closure)
@@ -598,7 +618,7 @@ def train(model,
 
             # Compute the gradient norm of the full objective function
             # NOTE: This will not work if we do minibatching
-            if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
+            if isinstance(opt, (Adam_LBFGS_NNCG, Adam_LBFGS_GD)) and i >= opt.switch_epoch2:
                 grad_norm = torch.norm(grad).item()
             else:
                 grad_norm = 0
@@ -608,6 +628,9 @@ def train(model,
 
             if isinstance(opt, Adam_LBFGS_NNCG) and i >= opt.switch_epoch2:
                 wandb.log({'step_size': opt.nncg.state_dict()['state'][0]['t']},
+                            commit=False)
+            elif isinstance(opt, Adam_LBFGS_GD) and i >= opt.switch_epoch2:
+                wandb.log({'step_size': opt.gd.state_dict()['state'][0]['t']},
                             commit=False)
 
             wandb.log({'loss': loss.item(),

@@ -1,5 +1,6 @@
 import torch
 from torch.optim import Optimizer
+from functools import reduce
 
 def _armijo(f, x, gx, dx, t, alpha=0.1, beta=0.5):
     f0 = f(x, 0, dx)
@@ -12,7 +13,9 @@ def _armijo(f, x, gx, dx, t, alpha=0.1, beta=0.5):
 class GD(Optimizer):
     def __init__(self, params, lr=1.0, line_search_fn=None, verbose=False):
         defaults = dict(lr=lr, line_search_fn=line_search_fn)
+        self.line_search_fn = line_search_fn
         self.verbose = verbose
+        self.n_iters = 0
         super(GD, self).__init__(params, defaults)
 
         if len(self.param_groups) > 1:
@@ -66,3 +69,27 @@ class GD(Optimizer):
         self.n_iters += 1
 
         return loss, g
+    
+    def _numel(self):
+        if self._numel_cache is None:
+            self._numel_cache = reduce(
+                lambda total, p: total + p.numel(), self._params, 0)
+        return self._numel_cache
+
+    def _add_grad(self, step_size, update):
+        offset = 0
+        for p in self._params:
+            numel = p.numel()
+            # Avoid in-place operation by creating a new tensor
+            p.data = p.data.add(
+                update[offset:offset + numel].view_as(p), alpha=step_size)
+            offset += numel
+        assert offset == self._numel()
+
+    def _clone_param(self):
+        return [p.clone(memory_format=torch.contiguous_format) for p in self._params]
+
+    def _set_param(self, params_data):
+        for p, pdata in zip(self._params, params_data):
+            # Replace the .data attribute of the tensor
+            p.data = pdata.data
