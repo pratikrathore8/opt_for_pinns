@@ -21,15 +21,15 @@ python run_experiment.py [--seed] [--pde] [--pde_params] [--opt] [--opt_params] 
 - `seed`: initial seed for reproducibility
 - `pde`: name of the PDE type
 - `pde_params`: PDE coefficients
-- `opt`: name of the optimizer / optimizer combo
+- `opt`: name of the optimizer (could also be an optimizer combo e.g. Adam + L-BFGS)
 - `opt_params`: optimizer parameters
-- `num_layers`: number of layers of the neural network
+- `num_layers`: number of layers of the PINN neural network
 - `num_neurons`: number of neurons of each hidden layer
-- `loss`: name of the loss function used for each component of PINN loss
+- `loss`: name of the loss function used for each component of the PINN loss
 - `num_x`: number of spatial points for the grid
 - `num_t`: number of temporal points for the grid
 - `num_res`: number of residual points to sample from the grid
-- `epochs`: total number of epochs to optimize the model
+- `epochs`: total number of epochs to optimize the model for
 - `wandb_project`: name for the Weights & Biases project (for logging and monitoring)
 - `device`: identifier of the GPU to be used for training
 
@@ -39,4 +39,4 @@ All of the experiment results discussed in the paper can be reproduced by runnin
 sh config/convection_adam_lbfgs_nncg_best.sh
 ```
 
-Notebooks in the `plotting` sub-directory can be used to reproduce plots demonstrated in the paper. 
+Notebooks in the `plotting` sub-directory can be used to reproduce the plots demonstrated in the paper. 
