@@ -4,7 +4,7 @@ This repository contains companion code for "Challenges in Training PINNs: A Los
 
 ## Installation
 
-After the repository is downloaded or cloned, please change to the opt_for_pinns/ directory and run the following code to pip install packages specified in `requirements.txt`: 
+After the repository is downloaded or cloned, please change to the `opt_for_pinns/` directory and run the following code to pip install packages specified in `requirements.txt`: 
 
 ```
 pip install -r requirements.txt
@@ -33,10 +33,10 @@ python run_experiment.py [--seed] [--pde] [--pde_params] [--opt] [--opt_params] 
 - `wandb_project`: name for the Weights & Biases project (for logging and monitoring)
 - `device`: identifier of the GPU to be used for training
 
-All of the experiment results discussed in the paper can be reproduced by running shell scripts located in the `config` sub-directory. For example, to run the experiments for the convection problem using NysNewton-CG (NNCG) after Adam + L-BFGS (discussed in section 7.3), one can run: 
+All of the experiment results discussed in the paper can be reproduced by running shell scripts located in the `config/` sub-directory. For example, to run the experiments for the convection problem using NysNewton-CG (NNCG) after Adam + L-BFGS (discussed in section 7.3), one can run: 
 
 ```
 sh config/convection_adam_lbfgs_nncg_best.sh
 ```
 
-Notebooks in the `plotting` sub-directory can be used to reproduce the plots shown in the paper. 
+Notebooks in the `plotting/` sub-directory can be used to reproduce the plots shown in the paper. 
