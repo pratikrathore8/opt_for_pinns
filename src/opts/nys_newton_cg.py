@@ -4,6 +4,7 @@ from torch.func import vmap
 from functools import reduce
 
 def _armijo(f, x, gx, dx, t, alpha=0.1, beta=0.5):
+    """Line search to find a step size that satisfies the Armijo condition."""
     f0 = f(x, 0, dx)
     f1 = f(x, t, dx)
     while f1 > f0 + alpha * t * gx.dot(dx):
@@ -12,11 +13,17 @@ def _armijo(f, x, gx, dx, t, alpha=0.1, beta=0.5):
     return t
 
 def _apply_nys_precond_inv(U, S_mu_inv, mu, lambd_r, x):
+    """Applies the inverse of the Nystrom approximation of the Hessian to a vector."""
     z = U.T @ x
     z = (lambd_r + mu) * (U @ (S_mu_inv * z)) + (x - U @ z)
     return z
 
 def _nystrom_pcg(hess, b, x, mu, U, S, r, tol, max_iters):
+    """Solves a positive-definite linear system using NyströmPCG.
+
+    `Frangella et al. Randomized Nyström Preconditioning. 
+    SIAM Journal on Matrix Analysis and Applications, 2023.
+    <https://epubs.siam.org/doi/10.1137/21M1466244>`"""
     lambd_r = S[r - 1]
     S_mu_inv = (S + mu) ** (-1)
 
@@ -40,8 +47,6 @@ def _nystrom_pcg(hess, b, x, mu, U, S, r, tol, max_iters):
 
             p = z + beta * p
 
-        # if i % 100 == 0:
-        #     print(f"PCG iteration {i} complete. Residual norm = {torch.norm(resid)}")
         i += 1
 
     if torch.norm(resid) > tol:
@@ -50,6 +55,39 @@ def _nystrom_pcg(hess, b, x, mu, U, S, r, tol, max_iters):
     return x
 
 class NysNewtonCG(Optimizer):
+    """Implementation of NysNewtonCG, a damped Newton-CG method that uses Nyström preconditioning.
+    
+    `Rathore et al. Challenges in Training PINNs: A Loss Landscape Perspective.
+    Preprint, 2024. <https://arxiv.org/abs/2402.01868>`
+
+    .. warning::
+        This optimizer doesn't support per-parameter options and parameter
+        groups (there can be only one).
+
+    NOTE: This optimizer is currently a beta version. 
+
+    Our implementation is inspired by the PyTorch implementation of `L-BFGS 
+    <https://pytorch.org/docs/stable/_modules/torch/optim/lbfgs.html#LBFGS>`.
+    
+    The parameters rank and mu will probably need to be tuned for your specific problem.
+    If the optimizer is running very slowly, you can try one of the following:
+    - Increase the rank (this should increase the accuracy of the Nyström approximation in PCG)
+    - Reduce cg_tol (this will allow PCG to terminate with a less accurate solution)
+    - Reduce cg_max_iters (this will allow PCG to terminate after fewer iterations)
+
+    Args:
+        params (iterable): iterable of parameters to optimize or dicts defining
+            parameter groups
+        lr (float, optional): learning rate (default: 1.0)
+        rank (int, optional): rank of the Nyström approximation (default: 10)
+        mu (float, optional): damping parameter (default: 1e-4)
+        chunk_size (int, optional): number of Hessian-vector products to be computed in parallel (default: 1)
+        cg_tol (float, optional): tolerance for PCG (default: 1e-16)
+        cg_max_iters (int, optional): maximum number of PCG iterations (default: 1000)
+        line_search_fn (str, optional): either 'armijo' or None (default: None)
+        verbose (bool, optional): verbosity (default: False)
+    
+    """
     def __init__(self, params, lr=1.0, rank=10, mu=1e-4, chunk_size=1,
                  cg_tol=1e-16, cg_max_iters=1000, line_search_fn=None, verbose=False):
         defaults = dict(lr=lr, rank=rank, chunk_size=chunk_size, mu=mu, cg_tol=cg_tol,
@@ -78,11 +116,18 @@ class NysNewtonCG(Optimizer):
         self._numel_cache = None
 
     def step(self, closure=None):
+        """Perform a single optimization step.
+
+        Args:
+            closure (callable, optional): A closure that reevaluates the model and returns (i) the loss and (ii) gradient w.r.t. the parameters.
+            The closure can compute the gradient w.r.t. the parameters by calling torch.autograd.grad on the loss with create_graph=True.
+        """
         if self.n_iters == 0:
             # Store the previous direction for warm starting PCG
             self.old_dir = torch.zeros(
                 self._numel(), device=self._params[0].device)
 
+        # NOTE: The closure must return both the loss and the gradient
         loss = None
         if closure is not None:
             with torch.enable_grad():
@@ -90,7 +135,7 @@ class NysNewtonCG(Optimizer):
 
         g = torch.cat([grad.view(-1) for grad in grad_tuple if grad is not None])
 
-        # one step update
+        # One step update
         for group_idx, group in enumerate(self.param_groups):
             def hvp_temp(x):
                 return self._hvp(g, self._params_list, x)
@@ -128,8 +173,6 @@ class NysNewtonCG(Optimizer):
                 np = torch.numel(p)
                 dp = d[ls:ls+np].view(p.shape)
                 ls += np
-                # if p.grad is None:
-                #     continue
                 p.data.add_(-dp, alpha=t)
 
         self.n_iters += 1
@@ -137,11 +180,19 @@ class NysNewtonCG(Optimizer):
         return loss, g
 
     def update_preconditioner(self, grad_tuple):
+        """Update the Nystrom approximation of the Hessian.
+
+        Args:
+            grad_tuple (tuple): tuple of Tensors containing the gradients of the loss w.r.t. the parameters. 
+            This tuple can be obtained by calling torch.autograd.grad on the loss with create_graph=True.
+        """
+
+        # Flatten and concatenate the gradients
         gradsH = torch.cat([gradient.view(-1)
                            for gradient in grad_tuple if gradient is not None])
 
-        p = gradsH.shape[0]
         # Generate test matrix (NOTE: This is transposed test matrix)
+        p = gradsH.shape[0]
         Phi = torch.randn(
             (self.rank, p), device=gradsH.device) / (p ** 0.5)
         Phi = torch.linalg.qr(Phi.t(), mode='reduced')[0].t()
@@ -151,8 +202,10 @@ class NysNewtonCG(Optimizer):
         # Calculate shift
         shift = torch.finfo(Y.dtype).eps
         Y_shifted = Y + shift * Phi
+
         # Calculate Phi^T * H * Phi (w/ shift) for Cholesky
         choleskytarget = torch.mm(Y_shifted, Phi.t())
+
         # Perform Cholesky, if fails, do eigendecomposition
         # The new shift is the abs of smallest eigenvalue (negative) plus the original shift
         try:
@@ -174,6 +227,7 @@ class NysNewtonCG(Optimizer):
         except:
             B = torch.linalg.solve_triangular(C.to('cpu'), Y_shifted.to(
                 'cpu'), upper=False, left=True).to(C.device)
+            
         # B = V * S * U^T b/c we have been using transposed sketch
         _, S, UT = torch.linalg.svd(B, full_matrices=False)
         self.U = UT.t()
