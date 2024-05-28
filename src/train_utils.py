@@ -64,6 +64,30 @@ def get_pde(pde_name, pde_params_list, loss_name):
 
             return loss_res, loss_bc, loss_ic
 
+    elif pde_name == "reaction_diffusion": 
+        if not {"nu", "rho"} <= pde_coefs.keys(): 
+            raise KeyError("nu or rho is not specified for reaction diffusion PDE.")
+
+        x_range = [0, 2 * np.pi]
+        t_range = [0, 1]
+
+        def loss_func(x, t, pred): 
+            x_res, x_left, x_upper, x_lower = x
+            t_res, t_left, t_upper, t_lower = t
+            outputs_res, outputs_left, outputs_upper, outputs_lower = pred
+
+            u_x = torch.autograd.grad(outputs_res, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+            u_xx = torch.autograd.grad(u_x, x_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+            u_t = torch.autograd.grad(outputs_res, t_res, grad_outputs=torch.ones_like(outputs_res), retain_graph=True, create_graph=True)[0]
+
+            loss_res = loss_type["res"](u_t - pde_coefs["nu"] * u_xx - pde_coefs["rho"] * outputs_res * (1 - outputs_res), torch.zeros_like(u_t))
+            loss_bc = loss_type["bc"](outputs_upper - outputs_lower, torch.zeros_like(outputs_upper))
+            loss_ic = loss_type["ic"](outputs_left[:,0], torch.exp(-(1/2) * torch.square((x_left[:,0] - np.pi) / (np.pi / 4))))
+
+            # loss = loss_res + loss_bc + loss_ic
+
+            return loss_res, loss_bc, loss_ic
+
     elif pde_name == "reaction": 
         if "rho" not in pde_coefs.keys(): 
             raise KeyError("rho is not specified for reaction PDE.")
@@ -135,7 +159,50 @@ OUTPUT:
 def get_ref_solutions(pde_name, pde_coefs, x, t, data_params): 
     if pde_name == "convection": 
         sol = np.vstack([np.sin(x[i].cpu().detach().numpy() - pde_coefs["beta"] * t[i].cpu().detach().numpy()) for i in range(len(x))])
-        
+    
+    elif pde_name == "reaction_diffusion": 
+        # unpack data-generation parameters
+        x_range = data_params["x_range"]
+        t_range = data_params["t_range"]
+        x_num = data_params["x_num"]
+        t_num = data_params["t_num"]
+        res_idx = data_params["res_idx"]
+        # generate grid
+        x = np.linspace(x_range[0], x_range[1], x_num-1, endpoint=False).reshape(-1, 1) # exclude upper boundary
+        t = np.linspace(t_range[0], t_range[1], t_num).reshape(-1, 1)
+        x_mesh, t_mesh = np.meshgrid(x, t)
+        # compute initial solution
+        u0 = np.exp(-(1/2) * np.square((x - np.pi) / (np.pi / 4))).flatten()
+        u = np.zeros((x_num, t_num))
+        u[:-1,0] = u0
+
+        IKX_pos = 1j * np.arange(0, (x_num-1) / 2 + 1, 1)
+        IKX_neg = 1j * np.arange(-(x_num-1) / 2 + 1, 0, 1)
+        IKX = np.concatenate((IKX_pos, IKX_neg))
+        IKX2 = IKX * IKX
+        # perform time-marching
+        t_step_size = (t_range[1] - t_range[0]) / (t_num - 1)
+        u_t = u0.copy()
+        for i in range(t_num - 1): 
+            # reaction component
+            factor = u_t * np.exp(pde_coefs['rho'] * t_step_size)
+            u_t = factor / (factor + (1 - u_t))
+            # diffusion component
+            factor = np.exp(pde_coefs['nu'] * IKX2 * t_step_size)
+            u_hat = np.fft.fft(u_t) * factor
+            u_t = np.real(np.fft.ifft(u_hat))
+            u[:-1,i+1] = u_t
+
+        # add back solution on the upper boundary using the periodic boundary condition
+        u[-1,:] = u[0,:]
+        # split the solution
+        sol_left = u[:,0].reshape(-1,1)
+        sol_upper = u[-1,:].reshape(-1,1)
+        sol_lower = u[0,:].reshape(-1,1)
+        sol_res = u[1:-1, 1:].T.reshape(-1,1)[res_idx]
+
+        sol = np.vstack([sol_res, sol_left, sol_upper, sol_lower])
+    
     elif pde_name == "reaction": 
         def compute_sol(x, t): 
             initial_func_term = np.exp(-(1/2) * np.square((x - np.pi) / (np.pi / 4)))
@@ -484,7 +551,6 @@ def train(model,
           n_x,
           n_t,
           n_res,
-          batch_size,
           num_epochs,
           device):
     model.apply(init_weights)
@@ -494,8 +560,6 @@ def train(model,
     opt = get_opt(opt_name, opt_params, model.parameters())
 
     logging_times = get_log_times(opt, LOG_FREQ, num_epochs)
-
-    # TODO: Account for different values of batch_size
 
     x, t, data_params = get_data(x_range, t_range, n_x, n_t, random=True, num_res_samples=n_res, device=device)
     wandb.log({'x': x, 't': t}) # Log training set

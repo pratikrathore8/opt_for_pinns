@@ -32,11 +32,8 @@ def main():
                         help='number of temporal sample points')
     parser.add_argument('--num_res', type=int, default=10000,
                         help='number of sampled residual points')
-    parser.add_argument('--batch_size', type=int, default=None,
-                        help='number of samples in each batch')
     parser.add_argument('--epochs', type=int, default=1000,
                         help='number of epochs to run')
-    # parser.add_argument('--log_frequency', type=int, default=100, help='number of epochs between logging actions')
     parser.add_argument('--wandb_project', type=str,
                         default='pinns', help='W&B project name')
     parser.add_argument('--device', type=str, default=0, help='GPU to use')
@@ -60,7 +57,6 @@ def main():
         "num_x": args.num_x,
         "num_t": args.num_t,
         "num_res": args.num_res, 
-        "batch_size": args.batch_size,
         "epochs": args.epochs,
         "wandb_project": args.wandb_project,
         "device": f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
@@ -80,7 +76,6 @@ def main():
     print("Number of temporal points (t): {}".format(experiment_args["num_t"]))
     print("Number of random residual points to sample: {}".format(experiment_args["num_res"]))
     print("Number of epochs: {}".format(experiment_args["epochs"]))
-    print("Batch size: {}".format(experiment_args["batch_size"]))
     print("Weights and Biases project: {}".format(
         experiment_args["wandb_project"]))
     print("GPU to use: {}".format(experiment_args["device"]))
@@ -101,7 +96,6 @@ def main():
                   n_x=experiment_args["num_x"],
                   n_t=experiment_args["num_t"],
                   n_res=experiment_args["num_res"],
-                  batch_size=experiment_args["batch_size"],
                   num_epochs=experiment_args["epochs"],
                   device=experiment_args["device"])
         # log error and traceback info to W&B, and exit gracefully

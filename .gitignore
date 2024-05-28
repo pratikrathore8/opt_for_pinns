@@ -4,3 +4,7 @@ __pycache__/
 *.apng
 wandb/
 *temp/
+.DS_Store
+._*
+Thumbs.db
+*.pyc
