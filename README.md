@@ -67,7 +67,7 @@ Once these scripts are finished running, please run `l2re_loss_scatter.ipynb` to
 
 ### Performance of Adam + L-BFGS (Section 6 & Appendix D)
 
-First, please run: 
+First, please run (if not already): 
 
 - `convection_adam.sh`
 - `convection_lbfgs.sh`
