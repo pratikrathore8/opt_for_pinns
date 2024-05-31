@@ -65,6 +65,10 @@ First, please run:
 
 Once these scripts are finished running, please run `l2re_loss_scatter.ipynb` to generate Figure 2. Note that `entity_name` in the notebook needs to be correctly specified to the associated Weights & Biases account. 
 
+### Ill-conditioning (Section 5)
+
+Please run `spectral_densities.ipynb` to generate Figure 3 and Figure 7. 
+
 ### Performance of Adam + L-BFGS (Section 6 & Appendix D)
 
 First, please run (if not already): 
@@ -102,10 +106,6 @@ Once these scripts are finished running, please run `under_optimization.ipynb` t
 
 Please run `line_search.ipynb` to generate Figure 9.
 
-### Ill-conditioning (Section 5)
-
-Please run `spectral_densities.ipynb` to generate Figure 3 and Figure 7. 
-
 ### Solution visualization (Section 7 & Appendix B)
 
 Please run `solution_visualizations.ipynb` to generate Figure 5 and Figure 6. 
@@ -116,7 +116,7 @@ Please run `condition_number.ipynb` to generate Figure 10.
 
 ## Citation
 
-If you found this library to be useful in your work, please cite the following paper: 
+If you found this repository to be useful in your work, please cite the following paper: 
 
 ```
 @inproceedings{rathore2024challenges,
