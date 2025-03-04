@@ -120,9 +120,9 @@ If you found this repository to be useful in your work, please cite the followin
 
 ```
 @inproceedings{rathore2024challenges,
-  title={Challenges in training PINNs: a loss landscape perspective},
-  author={Rathore, Pratik and Lei, Weimu and Frangella, Zachary and Lu, Lu and Udell, Madeleine},
-  booktitle={Proceedings of the 41st International Conference on Machine Learning (ICML 2024)},
-  year={2024}
+  title = {Challenges in Training {PINN}s: A Loss Landscape Perspective},
+  author = {Rathore, Pratik and Lei, Weimu and Frangella, Zachary and Lu, Lu and Udell, Madeleine},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning},
+  year = {2024},
 }
 ```
